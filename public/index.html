@@ -787,18 +787,33 @@
         }
 
         .visitor-counter {
-            display: inline-block;
-            background: var(--ink);
+            display: block;
+            background: linear-gradient(135deg, var(--ink) 0%, #1a0f0a 100%);
             color: var(--gold);
-            padding: 8px 20px;
-            border-radius: 5px;
-            margin-top: 15px;
-            font-size: 0.85rem;
+            padding: 25px 40px;
+            border-radius: 10px;
+            margin: 30px auto 20px;
+            max-width: 400px;
+            text-align: center;
+            border: 2px solid var(--sepia);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .visitor-counter .label {
+            font-size: 1rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 10px;
         }
 
         .visitor-counter .count {
             color: var(--cream);
-            font-weight: bold;
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 900;
+            display: block;
+            text-shadow: 2px 2px 0 var(--gold);
         }
 
         footer {
@@ -998,10 +1013,11 @@
         <div class="divider">✦</div>
 
         <footer>
-            <p>Powered by the mysteries of artificial intelligence & the wisdom of ages past</p>
             <div class="visitor-counter">
-                🎩 Time Travelers: <span class="count" id="visitorCount">...</span>
+                <span class="label">🎩 Time Travelers Who Have Visited</span>
+                <span class="count" id="visitorCount">...</span>
             </div>
+            <p>Powered by the mysteries of artificial intelligence & the wisdom of ages past</p>
         </footer>
     </div>
 
