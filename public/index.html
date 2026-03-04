@@ -786,6 +786,21 @@
             font-family: 'Special Elite', monospace;
         }
 
+        .visitor-counter {
+            display: inline-block;
+            background: var(--ink);
+            color: var(--gold);
+            padding: 8px 20px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+
+        .visitor-counter .count {
+            color: var(--cream);
+            font-weight: bold;
+        }
+
         footer {
             text-align: center;
             margin-top: 40px;
@@ -984,6 +999,9 @@
 
         <footer>
             <p>Powered by the mysteries of artificial intelligence & the wisdom of ages past</p>
+            <div class="visitor-counter">
+                🎩 Time Travelers: <span class="count" id="visitorCount">...</span>
+            </div>
         </footer>
     </div>
 
@@ -1002,10 +1020,36 @@
         const API_ENDPOINT = `${API_BASE}/chat`;
         const EVENTS_ENDPOINT = `${API_BASE}/events`;
         const STORY_ENDPOINT = `${API_BASE}/story`;
+        const COUNTER_ENDPOINT = `${API_BASE}/counter`;
         
         let cutoffDate = null;
         let conversationHistory = [];
         let currentEvents = [];
+
+        // Initialize visitor counter on page load
+        async function initVisitorCounter() {
+            try {
+                // Check if this is a new session
+                if (!sessionStorage.getItem('counted')) {
+                    // Increment counter for new visitor
+                    const response = await fetch(COUNTER_ENDPOINT, { method: 'POST' });
+                    const data = await response.json();
+                    document.getElementById('visitorCount').textContent = data.count.toLocaleString();
+                    sessionStorage.setItem('counted', 'true');
+                } else {
+                    // Just get current count
+                    const response = await fetch(COUNTER_ENDPOINT);
+                    const data = await response.json();
+                    document.getElementById('visitorCount').textContent = data.count.toLocaleString();
+                }
+            } catch (error) {
+                console.error('Counter error:', error);
+                document.getElementById('visitorCount').textContent = '—';
+            }
+        }
+
+        // Call on page load
+        initVisitorCounter();
 
         function formatDate(month, day, year) {
             const months = [

@@ -1,8 +1,43 @@
 const { onRequest } = require("firebase-functions/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+const admin = require("firebase-admin");
+
+// Initialize Firebase Admin
+admin.initializeApp();
+const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
+
+// Visitor Counter endpoint
+exports.counter = onRequest(
+  { 
+    cors: true,
+    invoker: "public"
+  },
+  async (req, res) => {
+    try {
+      const counterRef = db.collection("stats").doc("visitors");
+      
+      if (req.method === "POST") {
+        // Increment the counter
+        await counterRef.set(
+          { count: admin.firestore.FieldValue.increment(1) },
+          { merge: true }
+        );
+      }
+      
+      // Get current count
+      const doc = await counterRef.get();
+      const count = doc.exists ? doc.data().count : 0;
+      
+      return res.json({ count });
+    } catch (error) {
+      logger.error("Counter error", { message: error.message });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 // Historical Events endpoint
 exports.events = onRequest(
