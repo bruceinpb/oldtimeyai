@@ -8,7 +8,8 @@ const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 exports.events = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey]
+    secrets: [anthropicApiKey],
+    invoker: "public"
   },
   async (req, res) => {
     if (req.method !== "POST") {
@@ -102,7 +103,8 @@ Focus on genuinely significant events - wars, treaties, scientific discoveries, 
 exports.story = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey]
+    secrets: [anthropicApiKey],
+    invoker: "public"
   },
   async (req, res) => {
     if (req.method !== "POST") {
@@ -176,7 +178,8 @@ End with a thought-provoking reflection on the significance of this moment in hi
 exports.chat = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey]
+    secrets: [anthropicApiKey],
+    invoker: "public"
   },
   async (req, res) => {
     if (req.method !== "POST") {
