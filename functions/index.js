@@ -20,11 +20,18 @@ exports.counter = onRequest(
       const counterRef = db.collection("stats").doc("visitors");
       
       if (req.method === "POST") {
-        // Increment the counter
-        await counterRef.set(
-          { count: admin.firestore.FieldValue.increment(1) },
-          { merge: true }
-        );
+        const { setCount } = req.body || {};
+        
+        if (setCount !== undefined) {
+          // Set to specific value
+          await counterRef.set({ count: parseInt(setCount) });
+        } else {
+          // Increment the counter
+          await counterRef.set(
+            { count: admin.firestore.FieldValue.increment(1) },
+            { merge: true }
+          );
+        }
       }
       
       // Get current count

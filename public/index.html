@@ -14,6 +14,7 @@
             --rust: #b7410e;
             --cream: #faf3e0;
             --aged-paper: #e8d4a8;
+            --deep-brown: #1a0f0a;
         }
 
         * {
@@ -24,325 +25,352 @@
 
         body {
             font-family: 'Libre Baskerville', serif;
-            background: var(--parchment);
+            background: var(--deep-brown);
             min-height: 100vh;
             overflow-x: hidden;
-            position: relative;
         }
 
-        body::before {
-            content: '';
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: 
+                linear-gradient(180deg, rgba(26, 15, 10, 0.7) 0%, rgba(26, 15, 10, 0.9) 100%),
+                url("https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1920&q=80");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 40px 20px;
+        }
+
+        /* Animated particles */
+        .particles {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: 
-                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            overflow: hidden;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 1;
         }
 
-        .page-frame {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            bottom: 10px;
-            border: 3px double var(--sepia);
-            pointer-events: none;
-            z-index: 100;
-        }
-
-        .page-frame::before {
-            content: '';
+        .particle {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            right: 8px;
-            bottom: 8px;
-            border: 1px solid var(--sepia);
-            opacity: 0.5;
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0;
+            animation: float 8s infinite;
         }
 
-        .corner {
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 1s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 2s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 3s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 4s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 5s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 6s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 7s; }
+        .particle:nth-child(9) { left: 90%; animation-delay: 0.5s; }
+        .particle:nth-child(10) { left: 15%; animation-delay: 2.5s; }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
+        }
+
+        /* Decorative gear */
+        .gear {
             position: fixed;
-            width: 60px;
-            height: 60px;
-            z-index: 101;
-            color: var(--sepia);
-            font-size: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: var(--gold);
+            opacity: 0.1;
+            font-size: 200px;
+            animation: spin 60s linear infinite;
+            z-index: 0;
         }
 
-        .corner-tl { top: 15px; left: 15px; }
-        .corner-tr { top: 15px; right: 15px; transform: rotate(90deg); }
-        .corner-bl { bottom: 15px; left: 15px; transform: rotate(-90deg); }
-        .corner-br { bottom: 15px; right: 15px; transform: rotate(180deg); }
+        .gear-1 { top: 10%; left: 5%; }
+        .gear-2 { top: 60%; right: 5%; animation-direction: reverse; }
+        .gear-3 { bottom: 10%; left: 15%; font-size: 150px; }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
 
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 40px 20px;
             position: relative;
+            z-index: 10;
         }
 
-        header {
+        /* Main title */
+        .title-container {
             text-align: center;
-            margin-bottom: 30px;
-            padding: 30px;
-            position: relative;
+            margin-bottom: 20px;
         }
 
-        .header-ornament {
-            font-size: 24px;
+        .ornament-top {
+            font-size: 2rem;
             color: var(--gold);
-            letter-spacing: 10px;
-            margin-bottom: 15px;
-            animation: shimmer 3s ease-in-out infinite;
+            letter-spacing: 20px;
+            margin-bottom: 20px;
+            animation: pulse 2s ease-in-out infinite;
         }
 
-        @keyframes shimmer {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
         }
 
         h1 {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2.5rem, 8vw, 4.5rem);
+            font-size: clamp(3rem, 12vw, 7rem);
             font-weight: 900;
-            color: var(--ink);
-            text-shadow: 2px 2px 0 var(--gold);
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        h1::before, h1::after {
-            content: '⚙';
-            font-size: 0.5em;
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--rust);
-            animation: rotate 10s linear infinite;
-        }
-
-        h1::before { left: -50px; }
-        h1::after { right: -50px; animation-direction: reverse; }
-
-        @keyframes rotate {
-            from { transform: translateY(-50%) rotate(0deg); }
-            to { transform: translateY(-50%) rotate(360deg); }
+            color: var(--cream);
+            text-shadow: 
+                0 0 10px rgba(212, 160, 23, 0.5),
+                0 0 20px rgba(212, 160, 23, 0.3),
+                0 0 40px rgba(212, 160, 23, 0.2),
+                4px 4px 0 var(--gold);
+            letter-spacing: 5px;
+            margin-bottom: 15px;
         }
 
         .subtitle {
             font-family: 'Special Elite', monospace;
-            font-size: 1.1rem;
-            color: var(--sepia);
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            color: var(--gold);
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+        }
+
+        .credit {
+            font-family: 'Special Elite', monospace;
+            font-size: 0.9rem;
+            color: var(--cream);
+            opacity: 0.7;
             margin-top: 15px;
-            letter-spacing: 2px;
         }
 
-        .history-gallery {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
+        /* Decorative line */
+        .deco-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
             margin: 30px 0;
-            padding: 20px;
+            color: var(--gold);
         }
 
-        .history-image {
+        .deco-line::before,
+        .deco-line::after {
+            content: '';
+            width: 100px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Image gallery - vintage cards */
+        .gallery {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            perspective: 1000px;
+        }
+
+        .vintage-card {
+            width: 160px;
+            height: 200px;
             position: relative;
-            aspect-ratio: 1;
-            overflow: hidden;
-            border: 4px solid var(--sepia);
-            border-radius: 8px;
-            box-shadow: 
-                0 4px 15px rgba(0,0,0,0.3),
-                inset 0 0 30px rgba(0,0,0,0.2);
-            transition: all 0.4s ease;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
             cursor: pointer;
         }
 
-        .history-image::before {
+        .vintage-card:hover {
+            transform: rotateY(10deg) scale(1.05);
+        }
+
+        .vintage-card::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(
-                45deg,
-                rgba(139, 69, 19, 0.3) 0%,
-                transparent 50%,
-                rgba(139, 69, 19, 0.2) 100%
-            );
+            border: 8px solid var(--sepia);
+            border-radius: 5px;
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.5),
+                0 10px 30px rgba(0,0,0,0.5);
             z-index: 2;
             pointer-events: none;
         }
 
-        .history-image::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-                url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23grain)' opacity='0.15'/%3E%3C/svg%3E");
-            z-index: 3;
-            pointer-events: none;
-        }
-
-        .history-image img {
+        .vintage-card img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: sepia(40%) contrast(1.1) brightness(0.95);
-            transition: all 0.4s ease;
+            border-radius: 5px;
+            filter: sepia(50%) contrast(1.1);
         }
 
-        .history-image:hover {
-            transform: scale(1.05) rotate(-2deg);
-            box-shadow: 
-                0 10px 30px rgba(0,0,0,0.4),
-                inset 0 0 30px rgba(0,0,0,0.2);
-        }
-
-        .history-image:hover img {
-            filter: sepia(20%) contrast(1.15) brightness(1);
-            transform: scale(1.1);
-        }
-
-        .image-caption {
+        .vintage-card .card-label {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 10px 8px;
-            background: linear-gradient(transparent, rgba(44, 24, 16, 0.9));
-            color: var(--cream);
-            font-family: 'Special Elite', monospace;
-            font-size: 0.7rem;
-            text-align: center;
-            z-index: 4;
-            letter-spacing: 1px;
-        }
-
-        .date-section {
-            background: linear-gradient(135deg, var(--cream) 0%, var(--aged-paper) 100%);
-            border: 2px solid var(--sepia);
-            border-radius: 8px;
-            padding: 40px;
-            margin: 30px 0;
-            position: relative;
-            box-shadow: 
-                0 4px 20px rgba(0,0,0,0.15),
-                inset 0 0 60px rgba(139, 69, 19, 0.1);
-        }
-
-        .date-section::before {
-            content: '📜';
-            position: absolute;
-            top: -20px;
+            bottom: 15px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 2.5rem;
-            background: var(--parchment);
-            padding: 0 15px;
+            background: rgba(26, 15, 10, 0.9);
+            color: var(--gold);
+            padding: 8px 15px;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            z-index: 3;
+            border: 1px solid var(--gold);
         }
 
-        .date-label {
+        /* Date selector - steampunk style */
+        .date-machine {
+            background: 
+                linear-gradient(135deg, var(--aged-paper) 0%, var(--parchment) 50%, var(--aged-paper) 100%);
+            border: 4px solid var(--sepia);
+            border-radius: 20px;
+            padding: 50px 40px;
+            max-width: 700px;
+            margin: 30px auto;
+            position: relative;
+            box-shadow: 
+                0 20px 60px rgba(0,0,0,0.5),
+                inset 0 0 100px rgba(139, 69, 19, 0.2);
+        }
+
+        .date-machine::before {
+            content: '⚙️';
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 3.5rem;
+            background: var(--deep-brown);
+            padding: 0 20px;
+            border-radius: 50%;
+        }
+
+        .date-machine::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 2px dashed var(--sepia);
+            border-radius: 15px;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .machine-title {
             font-family: 'Playfair Display', serif;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             color: var(--ink);
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
 
-        .date-input-wrapper {
+        .machine-desc {
+            text-align: center;
+            color: var(--sepia);
+            font-style: italic;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .date-dials {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 25px;
             flex-wrap: wrap;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }
 
-        .date-field {
+        .dial {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        .date-field label {
+        .dial label {
             font-family: 'Special Elite', monospace;
             font-size: 0.8rem;
             color: var(--sepia);
-            margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            margin-bottom: 8px;
         }
 
-        .date-field input, .date-field select {
+        .dial select,
+        .dial input {
             font-family: 'Playfair Display', serif;
-            font-size: 1.3rem;
-            padding: 12px 15px;
-            border: 2px solid var(--sepia);
-            border-radius: 5px;
-            background: var(--parchment);
+            font-size: 1.5rem;
+            padding: 15px 20px;
+            border: 3px solid var(--sepia);
+            border-radius: 10px;
+            background: var(--cream);
             color: var(--ink);
             text-align: center;
+            box-shadow: 
+                inset 0 2px 5px rgba(0,0,0,0.1),
+                0 4px 0 var(--sepia);
             transition: all 0.3s;
         }
 
-        .date-field input:focus, .date-field select:focus {
+        .dial select:focus,
+        .dial input:focus {
             outline: none;
             border-color: var(--gold);
-            box-shadow: 0 0 15px rgba(212, 160, 23, 0.3);
+            box-shadow: 
+                inset 0 2px 5px rgba(0,0,0,0.1),
+                0 4px 0 var(--gold),
+                0 0 20px rgba(212, 160, 23, 0.3);
         }
 
-        .date-field input[type="number"] {
-            width: 80px;
-        }
+        .dial input[type="number"] { width: 100px; }
+        .dial select { width: 180px; cursor: pointer; }
 
-        .date-field select {
-            width: 160px;
-            cursor: pointer;
-        }
-
-        .year-input {
-            width: 100px !important;
-        }
-
-        .date-description {
-            text-align: center;
-            font-style: italic;
-            margin-bottom: 25px;
-            color: var(--sepia);
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-
+        /* Activate button */
         .activate-btn {
             display: block;
             margin: 0 auto;
             font-family: 'Special Elite', monospace;
-            font-size: 1.2rem;
-            padding: 18px 60px;
-            background: linear-gradient(180deg, var(--rust) 0%, #8b2500 100%);
+            font-size: 1.3rem;
+            padding: 20px 50px;
+            background: linear-gradient(180deg, var(--rust) 0%, #6b1a00 100%);
             color: var(--cream);
             border: none;
-            border-radius: 5px;
+            border-radius: 10px;
             cursor: pointer;
             letter-spacing: 3px;
             text-transform: uppercase;
             transition: all 0.3s;
-            box-shadow: 0 4px 0 #5a1a00, 0 6px 20px rgba(0,0,0,0.3);
+            box-shadow: 
+                0 6px 0 #4a1200,
+                0 10px 30px rgba(0,0,0,0.4);
             position: relative;
             overflow: hidden;
         }
@@ -354,22 +382,53 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
             transition: left 0.5s;
         }
 
-        .activate-btn:hover::before {
-            left: 100%;
+        .activate-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 9px 0 #4a1200,
+                0 15px 40px rgba(0,0,0,0.5);
         }
 
-        .activate-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 0 #5a1a00, 0 10px 30px rgba(0,0,0,0.4);
-        }
+        .activate-btn:hover::before { left: 100%; }
 
         .activate-btn:active {
-            transform: translateY(2px);
-            box-shadow: 0 2px 0 #5a1a00, 0 4px 15px rgba(0,0,0,0.3);
+            transform: translateY(3px);
+            box-shadow: 
+                0 3px 0 #4a1200,
+                0 5px 20px rgba(0,0,0,0.4);
+        }
+
+        /* Era quick buttons */
+        .era-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 2px dashed var(--sepia);
+        }
+
+        .era-btn {
+            font-family: 'Special Elite', monospace;
+            font-size: 0.85rem;
+            padding: 10px 18px;
+            background: var(--cream);
+            color: var(--sepia);
+            border: 2px solid var(--sepia);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .era-btn:hover {
+            background: var(--sepia);
+            color: var(--cream);
+            transform: scale(1.05);
         }
 
         /* Main content layout with sidebar */
@@ -377,6 +436,7 @@
             display: none;
             gap: 25px;
             margin-top: 30px;
+            max-width: 1100px;
         }
 
         .main-content.active {
@@ -396,7 +456,7 @@
             border: 2px solid var(--sepia);
             border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             max-height: 700px;
             overflow-y: auto;
         }
@@ -449,9 +509,7 @@
             margin-top: 5px;
         }
 
-        .event-link:hover .event-date {
-            color: var(--gold);
-        }
+        .event-link:hover .event-date { color: var(--gold); }
 
         .coming-soon {
             margin-top: 20px;
@@ -532,6 +590,7 @@
             border-radius: 5px;
             font-size: 1.1rem;
             letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
 
         .time-badge::before {
@@ -637,14 +696,8 @@
             letter-spacing: 2px;
         }
 
-        .send-btn:hover {
-            background: var(--ink);
-        }
-
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .send-btn:hover { background: var(--ink); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .loading {
             display: flex;
@@ -670,43 +723,54 @@
             font-size: 0.9rem;
             padding: 10px 25px;
             background: transparent;
-            color: var(--sepia);
-            border: 1px solid var(--sepia);
+            color: var(--gold);
+            border: 1px solid var(--gold);
             border-radius: 3px;
             cursor: pointer;
             transition: all 0.3s;
         }
 
         .reset-btn:hover {
-            background: var(--sepia);
-            color: var(--cream);
+            background: var(--gold);
+            color: var(--deep-brown);
         }
 
-        .era-suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px dashed var(--sepia);
+        /* Visitor Counter */
+        .visitor-section {
+            text-align: center;
+            margin: 50px 0 30px;
         }
 
-        .era-btn {
+        .visitor-counter {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--ink) 0%, var(--deep-brown) 100%);
+            padding: 30px 60px;
+            border-radius: 15px;
+            border: 3px solid var(--gold);
+            box-shadow: 
+                0 0 30px rgba(212, 160, 23, 0.3),
+                0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        .visitor-counter .label {
+            display: block;
             font-family: 'Special Elite', monospace;
-            font-size: 0.8rem;
-            padding: 8px 15px;
-            background: var(--parchment);
-            color: var(--sepia);
-            border: 1px solid var(--sepia);
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
+            font-size: 1rem;
+            color: var(--gold);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
         }
 
-        .era-btn:hover {
-            background: var(--sepia);
+        .visitor-counter .count {
+            display: block;
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 900;
             color: var(--cream);
+            text-shadow: 
+                0 0 10px rgba(212, 160, 23, 0.5),
+                3px 3px 0 var(--gold);
         }
 
         /* Story Modal */
@@ -717,16 +781,14 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(44, 24, 16, 0.85);
+            background: rgba(26, 15, 10, 0.9);
             z-index: 2000;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
 
-        .modal-overlay.active {
-            display: flex;
-        }
+        .modal-overlay.active { display: flex; }
 
         .modal-content {
             background: var(--cream);
@@ -752,9 +814,7 @@
             transition: color 0.3s;
         }
 
-        .modal-close:hover {
-            color: var(--rust);
-        }
+        .modal-close:hover { color: var(--rust); }
 
         .modal-title {
             font-family: 'Playfair Display', serif;
@@ -786,61 +846,17 @@
             font-family: 'Special Elite', monospace;
         }
 
-        .visitor-counter {
-            display: block;
-            background: linear-gradient(135deg, var(--ink) 0%, #1a0f0a 100%);
-            color: var(--gold);
-            padding: 25px 40px;
-            border-radius: 10px;
-            margin: 30px auto 20px;
-            max-width: 400px;
-            text-align: center;
-            border: 2px solid var(--sepia);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .visitor-counter .label {
-            font-size: 1rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            display: block;
-            margin-bottom: 10px;
-        }
-
-        .visitor-counter .count {
-            color: var(--cream);
-            font-family: 'Playfair Display', serif;
-            font-size: 3rem;
-            font-weight: 900;
-            display: block;
-            text-shadow: 2px 2px 0 var(--gold);
-        }
-
+        /* Footer */
         footer {
             text-align: center;
-            margin-top: 40px;
-            padding: 20px;
+            padding: 30px 20px;
+            color: var(--gold);
             font-family: 'Special Elite', monospace;
-            color: var(--sepia);
             font-size: 0.9rem;
+            opacity: 0.7;
         }
 
-        .divider {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin: 30px 0;
-            color: var(--sepia);
-        }
-
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--sepia), transparent);
-        }
-
+        /* Responsive */
         @media (max-width: 900px) {
             .main-content.active {
                 grid-template-columns: 1fr;
@@ -853,173 +869,191 @@
         }
 
         @media (max-width: 768px) {
-            h1::before, h1::after {
-                display: none;
-            }
+            .gallery { gap: 15px; }
             
-            .history-gallery {
-                grid-template-columns: repeat(2, 1fr);
+            .vintage-card {
+                width: 140px;
+                height: 180px;
             }
-            
-            .date-input-wrapper {
+
+            .date-machine {
+                padding: 40px 20px;
+                margin: 30px 15px;
+            }
+
+            .date-dials {
                 flex-direction: column;
                 align-items: center;
             }
-            
-            .input-area {
-                flex-direction: column;
+
+            .input-area { flex-direction: column; }
+
+            .gear { display: none; }
+
+            .visitor-counter {
+                padding: 20px 30px;
             }
 
-            .era-suggestions {
-                gap: 8px;
-            }
-
-            .era-btn {
-                font-size: 0.7rem;
-                padding: 6px 12px;
+            .visitor-counter .count {
+                font-size: 3rem;
             }
         }
     </style>
 </head>
 <body>
-    <div class="page-frame"></div>
-    <div class="corner corner-tl">❧</div>
-    <div class="corner corner-tr">❧</div>
-    <div class="corner corner-bl">❧</div>
-    <div class="corner corner-br">❧</div>
+    <!-- Floating particles -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
 
-    <div class="container">
-        <header>
-            <div class="header-ornament">✦ ✦ ✦</div>
-            <h1>Old Timey AI</h1>
-            <p class="subtitle">~ Journey Through the Annals of History ~</p>
-            <p class="subtitle" style="font-size: 0.9rem; margin-top: 10px;">Created, Hosted, and Paid For By Bruce Taylor</p>
-        </header>
+    <!-- Decorative gears -->
+    <div class="gear gear-1">⚙</div>
+    <div class="gear gear-2">⚙</div>
+    <div class="gear gear-3">⚙</div>
 
-        <div class="history-gallery">
-            <div class="history-image">
-                <img src="https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=400&fit=crop" alt="Ancient Greek ruins" loading="lazy">
-                <div class="image-caption">Ancient Ruins</div>
+    <section class="hero">
+        <div class="container">
+            <div class="title-container">
+                <div class="ornament-top">✦ ✦ ✦</div>
+                <h1>Old Timey AI</h1>
+                <p class="subtitle">~ Journey Through the Annals of History ~</p>
+                <p class="credit">Created, Hosted, and Paid For By Bruce Taylor</p>
             </div>
-            <div class="history-image">
-                <img src="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=400&fit=crop" alt="Medieval castle" loading="lazy">
-                <div class="image-caption">Medieval Era</div>
-            </div>
-            <div class="history-image">
-                <img src="https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=400&fit=crop" alt="Victorian architecture" loading="lazy">
-                <div class="image-caption">Victorian Age</div>
-            </div>
-            <div class="history-image">
-                <img src="https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop" alt="Vintage typewriter" loading="lazy">
-                <div class="image-caption">Industrial Era</div>
-            </div>
-        </div>
 
-        <div class="date-section" id="dateSection">
-            <p class="date-label">⚙ Set Your Knowledge Cutoff Date ⚙</p>
-            <p class="date-description">
-                Choose any date in history, and the AI shall possess no knowledge of events, 
-                discoveries, or happenings beyond that momentous day.
-            </p>
-            
-            <div class="date-input-wrapper">
-                <div class="date-field">
-                    <label>Month</label>
-                    <select id="month">
-                        <option value="1">January</option>
-                        <option value="2">February</option>
-                        <option value="3">March</option>
-                        <option value="4">April</option>
-                        <option value="5">May</option>
-                        <option value="6">June</option>
-                        <option value="7">July</option>
-                        <option value="8">August</option>
-                        <option value="9">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12" selected>December</option>
-                    </select>
+            <div class="deco-line">⚜</div>
+
+            <!-- Vintage card gallery -->
+            <div class="gallery">
+                <div class="vintage-card">
+                    <img src="https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop" alt="Ancient ruins">
+                    <div class="card-label">Ancient World</div>
                 </div>
-                <div class="date-field">
-                    <label>Day</label>
-                    <input type="number" id="day" min="1" max="31" value="4" />
+                <div class="vintage-card">
+                    <img src="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop" alt="Medieval">
+                    <div class="card-label">Medieval Era</div>
                 </div>
-                <div class="date-field">
-                    <label>Year</label>
-                    <input type="number" id="year" class="year-input" min="1" max="2025" value="1955" />
+                <div class="vintage-card">
+                    <img src="https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop" alt="Victorian">
+                    <div class="card-label">Victorian Age</div>
+                </div>
+                <div class="vintage-card">
+                    <img src="https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=400&h=500&fit=crop" alt="Industrial">
+                    <div class="card-label">Industrial Era</div>
                 </div>
             </div>
 
-            <button class="activate-btn" onclick="activateTimeMachine()">
-                ⚙ Activate Time Machine ⚙
-            </button>
+            <!-- Date Machine -->
+            <div class="date-machine" id="dateSection">
+                <h2 class="machine-title">⚙ Set Your Knowledge Cutoff Date ⚙</h2>
+                <p class="machine-desc">
+                    Choose any date in history, and the AI shall possess no knowledge of events, 
+                    discoveries, or happenings beyond that momentous day.
+                </p>
 
-            <div class="era-suggestions">
-                <button class="era-btn" onclick="setEra(7, 4, 1776)">🇺🇸 American Revolution</button>
-                <button class="era-btn" onclick="setEra(6, 28, 1914)">⚔️ WWI Begins</button>
-                <button class="era-btn" onclick="setEra(7, 20, 1969)">🚀 Moon Landing</button>
-                <button class="era-btn" onclick="setEra(11, 9, 1989)">🧱 Berlin Wall Falls</button>
-                <button class="era-btn" onclick="setEra(1, 1, 1900)">🎩 Turn of Century</button>
-                <button class="era-btn" onclick="setEra(12, 7, 1941)">💥 Pearl Harbor</button>
-            </div>
-        </div>
-
-        <!-- Main content with sidebar -->
-        <div class="main-content" id="mainContent">
-            <!-- Sidebar with historical events -->
-            <aside class="sidebar" id="sidebar">
-                <h3 class="sidebar-title">📰 Headlines of the Day</h3>
-                <p class="sidebar-subtitle">Click to read the full story</p>
-                <div id="eventsContainer">
-                    <div class="sidebar-loading">
-                        <p>Searching the archives...</p>
-                        <div class="loading-dots">
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                        </div>
+                <div class="date-dials">
+                    <div class="dial">
+                        <label>Month</label>
+                        <select id="month">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12" selected>December</option>
+                        </select>
+                    </div>
+                    <div class="dial">
+                        <label>Day</label>
+                        <input type="number" id="day" value="4" min="1" max="31">
+                    </div>
+                    <div class="dial">
+                        <label>Year</label>
+                        <input type="number" id="year" value="1955" min="1" max="2025">
                     </div>
                 </div>
-                <div id="comingSoonContainer"></div>
-            </aside>
 
-            <!-- Chat section -->
-            <div class="chat-section">
-                <div class="time-badge">
-                    AI Knowledge Limited To: <span id="cutoffDisplay"></span>
+                <button class="activate-btn" onclick="activateTimeMachine()">⚙ Activate Time Machine ⚙</button>
+
+                <div class="era-buttons">
+                    <button class="era-btn" onclick="setEra(7, 4, 1776)">🇺🇸 American Revolution</button>
+                    <button class="era-btn" onclick="setEra(6, 28, 1914)">⚔️ WWI Begins</button>
+                    <button class="era-btn" onclick="setEra(7, 20, 1969)">🚀 Moon Landing</button>
+                    <button class="era-btn" onclick="setEra(11, 9, 1989)">🧱 Berlin Wall Falls</button>
+                    <button class="era-btn" onclick="setEra(1, 1, 1900)">🎩 Turn of Century</button>
+                    <button class="era-btn" onclick="setEra(12, 7, 1941)">💥 Pearl Harbor</button>
                 </div>
-
-                <div class="chat-box" id="chatBox"></div>
-
-                <div class="input-area">
-                    <textarea 
-                        class="chat-input" 
-                        id="userInput" 
-                        placeholder="Ask about history, events, or knowledge from before your chosen date..."
-                        rows="2"
-                        onkeydown="handleKeyDown(event)"
-                    ></textarea>
-                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                        SEND
-                    </button>
-                </div>
-
-                <button class="reset-btn" onclick="resetTimeMachine()">
-                    ↺ Choose a Different Date
-                </button>
             </div>
+
+            <!-- Main content with sidebar -->
+            <div class="main-content" id="mainContent">
+                <!-- Sidebar with historical events -->
+                <aside class="sidebar" id="sidebar">
+                    <h3 class="sidebar-title">📰 Headlines of the Day</h3>
+                    <p class="sidebar-subtitle">Click to read the full story</p>
+                    <div id="eventsContainer">
+                        <div class="sidebar-loading">
+                            <p>Searching the archives...</p>
+                            <div class="loading-dots">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="comingSoonContainer"></div>
+                </aside>
+
+                <!-- Chat section -->
+                <div class="chat-section">
+                    <div class="time-badge">
+                        AI Knowledge Limited To: <span id="cutoffDisplay"></span>
+                    </div>
+
+                    <div class="chat-box" id="chatBox"></div>
+
+                    <div class="input-area">
+                        <textarea 
+                            class="chat-input" 
+                            id="userInput" 
+                            placeholder="Ask about history, events, or knowledge from before your chosen date..."
+                            rows="2"
+                            onkeydown="handleKeyDown(event)"
+                        ></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">SEND</button>
+                    </div>
+
+                    <button class="reset-btn" onclick="resetTimeMachine()">↺ Choose a Different Date</button>
+                </div>
+            </div>
+
+            <!-- Visitor Counter -->
+            <div class="visitor-section">
+                <div class="visitor-counter">
+                    <span class="label">🎩 Time Travelers Who Have Visited</span>
+                    <span class="count" id="visitorCount">...</span>
+                </div>
+            </div>
+
+            <footer>
+                Powered by the mysteries of artificial intelligence & the wisdom of ages past
+            </footer>
         </div>
-
-        <div class="divider">✦</div>
-
-        <footer>
-            <div class="visitor-counter">
-                <span class="label">🎩 Time Travelers Who Have Visited</span>
-                <span class="count" id="visitorCount">...</span>
-            </div>
-            <p>Powered by the mysteries of artificial intelligence & the wisdom of ages past</p>
-        </footer>
-    </div>
+    </section>
 
     <!-- Story Modal -->
     <div class="modal-overlay" id="storyModal">
@@ -1045,15 +1079,12 @@
         // Initialize visitor counter on page load
         async function initVisitorCounter() {
             try {
-                // Check if this is a new session
                 if (!sessionStorage.getItem('counted')) {
-                    // Increment counter for new visitor
                     const response = await fetch(COUNTER_ENDPOINT, { method: 'POST' });
                     const data = await response.json();
                     document.getElementById('visitorCount').textContent = data.count.toLocaleString();
                     sessionStorage.setItem('counted', 'true');
                 } else {
-                    // Just get current count
                     const response = await fetch(COUNTER_ENDPOINT);
                     const data = await response.json();
                     document.getElementById('visitorCount').textContent = data.count.toLocaleString();
@@ -1064,7 +1095,6 @@
             }
         }
 
-        // Call on page load
         initVisitorCounter();
 
         function formatDate(month, day, year) {
@@ -1098,7 +1128,6 @@
             document.getElementById('mainContent').classList.add('active');
             document.getElementById('dateSection').style.display = 'none';
             
-            // Reset conversation
             conversationHistory = [];
             const chatBox = document.getElementById('chatBox');
             chatBox.innerHTML = `
@@ -1112,10 +1141,7 @@
                 </div>
             `;
 
-            // Scroll to main content
             document.getElementById('mainContent').scrollIntoView({ behavior: 'smooth' });
-
-            // Fetch historical events
             await fetchHistoricalEvents();
         }
 
@@ -1147,7 +1173,6 @@
                 const data = await response.json();
                 currentEvents = data.events || [];
 
-                // Render events
                 if (currentEvents.length > 0) {
                     eventsContainer.innerHTML = currentEvents.map((event, index) => `
                         <a class="event-link" onclick="openStory(${index})">
@@ -1159,7 +1184,6 @@
                     eventsContainer.innerHTML = '<p style="text-align:center; color: var(--sepia);">No events found for this date.</p>';
                 }
 
-                // Render coming soon
                 if (data.comingSoon) {
                     comingSoonContainer.innerHTML = `
                         <div class="coming-soon">
@@ -1221,12 +1245,10 @@
             document.getElementById('storyModal').classList.remove('active');
         }
 
-        // Close modal on overlay click
         document.getElementById('storyModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
         });
 
-        // Close modal on Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') closeModal();
         });
