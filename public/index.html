@@ -462,16 +462,36 @@
         .dial input[type="number"] { width: 130px; }
         .dial select { width: 180px; cursor: pointer; }
 
-        /* Slot machine spinning animation */
+        /* Slot machine smooth rolling animation */
         .dial.spinning select,
         .dial.spinning input {
-            animation: slotSpin 0.1s linear infinite;
+            background: linear-gradient(
+                0deg,
+                var(--cream) 0%,
+                var(--aged-paper) 20%,
+                var(--cream) 40%,
+                var(--aged-paper) 60%,
+                var(--cream) 80%,
+                var(--aged-paper) 100%
+            );
+            background-size: 100% 200%;
+            animation: slotRoll 0.15s linear infinite;
         }
 
-        @keyframes slotSpin {
-            0% { transform: translateY(-2px); }
-            50% { transform: translateY(2px); }
-            100% { transform: translateY(-2px); }
+        @keyframes slotRoll {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+
+        /* Slowdown animation */
+        .dial.slowing select,
+        .dial.slowing input {
+            animation: slotRoll 0.3s linear infinite;
+        }
+
+        .dial.stopping select,
+        .dial.stopping input {
+            animation: slotRoll 0.6s linear infinite;
         }
 
         /* Flashing prompt */
@@ -1442,7 +1462,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
 
         initVisitorCounter();
 
-        // Slot machine date spinner
+        // Slot machine date spinner - smooth rolling effect
         function startSlotMachine() {
             const monthSelect = document.getElementById('month');
             const dayInput = document.getElementById('day');
@@ -1452,44 +1472,70 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             const yearDial = document.getElementById('yearDial');
             const datePrompt = document.getElementById('datePrompt');
 
-            // Add spinning class
-            monthDial.classList.add('spinning');
-            dayDial.classList.add('spinning');
-            yearDial.classList.add('spinning');
-
             // Current year for random range
             const currentYear = new Date().getFullYear();
             
-            // Spin the values rapidly
-            let spinCount = 0;
+            // Final random values
+            const finalMonth = Math.floor(Math.random() * 12) + 1;
+            const finalDay = Math.floor(Math.random() * 28) + 1;
+            const finalYear = Math.floor(Math.random() * (currentYear - 1)) + 1;
+
+            // Add spinning class to all
+            monthDial.classList.add('spinning');
+            dayDial.classList.add('spinning');
+            yearDial.classList.add('spinning');
+            
+            // Smoothly update values at moderate pace
+            let elapsed = 0;
+            const duration = 3000; // 3 seconds total
+            const updateInterval = 120; // Update every 120ms for smooth rolling
+            
             const spinInterval = setInterval(() => {
-                monthSelect.value = Math.floor(Math.random() * 12) + 1;
-                dayInput.value = Math.floor(Math.random() * 28) + 1;
-                yearInput.value = Math.floor(Math.random() * currentYear) + 1;
-                spinCount++;
-            }, 80);
-
-            // After 4 seconds, stop and land on random date
-            setTimeout(() => {
-                clearInterval(spinInterval);
+                elapsed += updateInterval;
                 
-                // Remove spinning class
-                monthDial.classList.remove('spinning');
-                dayDial.classList.remove('spinning');
-                yearDial.classList.remove('spinning');
-
-                // Set final random date
-                const finalMonth = Math.floor(Math.random() * 12) + 1;
-                const finalDay = Math.floor(Math.random() * 28) + 1;
-                const finalYear = Math.floor(Math.random() * currentYear) + 1;
+                // Calculate progress (0 to 1)
+                const progress = elapsed / duration;
                 
-                monthSelect.value = finalMonth;
-                dayInput.value = finalDay;
-                yearInput.value = finalYear;
+                // Slow down as we approach the end (ease-out effect)
+                if (progress < 0.7) {
+                    // Fast spinning phase
+                    monthSelect.value = Math.floor(Math.random() * 12) + 1;
+                    dayInput.value = Math.floor(Math.random() * 28) + 1;
+                    yearInput.value = Math.floor(Math.random() * currentYear) + 1;
+                } else if (progress < 0.85) {
+                    // Slowing down - month stops first
+                    monthDial.classList.remove('spinning');
+                    monthDial.classList.add('slowing');
+                    monthSelect.value = finalMonth;
+                    dayInput.value = Math.floor(Math.random() * 28) + 1;
+                    yearInput.value = Math.floor(Math.random() * currentYear) + 1;
+                } else if (progress < 0.95) {
+                    // Day stops second
+                    monthDial.classList.remove('slowing');
+                    dayDial.classList.remove('spinning');
+                    dayDial.classList.add('stopping');
+                    dayInput.value = finalDay;
+                    yearInput.value = Math.floor(Math.random() * currentYear) + 1;
+                }
+                
+                // Stop everything at the end
+                if (elapsed >= duration) {
+                    clearInterval(spinInterval);
+                    
+                    // Remove all animation classes
+                    monthDial.classList.remove('spinning', 'slowing', 'stopping');
+                    dayDial.classList.remove('spinning', 'slowing', 'stopping');
+                    yearDial.classList.remove('spinning', 'slowing', 'stopping');
+                    
+                    // Set final values
+                    monthSelect.value = finalMonth;
+                    dayInput.value = finalDay;
+                    yearInput.value = finalYear;
 
-                // Show flashing prompt
-                datePrompt.classList.add('visible');
-            }, 4000);
+                    // Show flashing prompt
+                    datePrompt.classList.add('visible');
+                }
+            }, updateInterval);
         }
 
         // Start slot machine on page load
