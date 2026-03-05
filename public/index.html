@@ -459,8 +459,40 @@
                 0 0 20px rgba(212, 160, 23, 0.3);
         }
 
-        .dial input[type="number"] { width: 100px; }
+        .dial input[type="number"] { width: 130px; }
         .dial select { width: 180px; cursor: pointer; }
+
+        /* Slot machine spinning animation */
+        .dial.spinning select,
+        .dial.spinning input {
+            animation: slotSpin 0.1s linear infinite;
+        }
+
+        @keyframes slotSpin {
+            0% { transform: translateY(-2px); }
+            50% { transform: translateY(2px); }
+            100% { transform: translateY(-2px); }
+        }
+
+        /* Flashing prompt */
+        .date-prompt {
+            text-align: center;
+            margin-top: 20px;
+            font-family: 'Special Elite', monospace;
+            font-size: 1.2rem;
+            color: var(--rust);
+            animation: flashPrompt 1s ease-in-out infinite;
+            display: none;
+        }
+
+        .date-prompt.visible {
+            display: block;
+        }
+
+        @keyframes flashPrompt {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
 
         .activate-btn {
             display: block;
@@ -1101,7 +1133,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                     </p>
 
                     <div class="date-dials">
-                        <div class="dial">
+                        <div class="dial" id="monthDial">
                             <label>Month</label>
                             <select id="month">
                                 <option value="1">January</option>
@@ -1115,18 +1147,20 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                                 <option value="9">September</option>
                                 <option value="10">October</option>
                                 <option value="11">November</option>
-                                <option value="12" selected>December</option>
+                                <option value="12">December</option>
                             </select>
                         </div>
-                        <div class="dial">
+                        <div class="dial" id="dayDial">
                             <label>Day</label>
-                            <input type="number" id="day" value="4" min="1" max="31">
+                            <input type="number" id="day" value="1" min="1" max="31">
                         </div>
-                        <div class="dial">
+                        <div class="dial" id="yearDial">
                             <label>Year</label>
-                            <input type="number" id="year" value="1955" min="1" max="2025">
+                            <input type="number" id="year" value="1" min="1" max="2026">
                         </div>
                     </div>
+
+                    <p class="date-prompt" id="datePrompt">⚡ Please Set Your Own Date ⚡</p>
 
                     <button class="activate-btn" onclick="activateTimeMachine()">⚙ Activate Time Machine ⚙</button>
 
@@ -1408,6 +1442,59 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
 
         initVisitorCounter();
 
+        // Slot machine date spinner
+        function startSlotMachine() {
+            const monthSelect = document.getElementById('month');
+            const dayInput = document.getElementById('day');
+            const yearInput = document.getElementById('year');
+            const monthDial = document.getElementById('monthDial');
+            const dayDial = document.getElementById('dayDial');
+            const yearDial = document.getElementById('yearDial');
+            const datePrompt = document.getElementById('datePrompt');
+
+            // Add spinning class
+            monthDial.classList.add('spinning');
+            dayDial.classList.add('spinning');
+            yearDial.classList.add('spinning');
+
+            // Current year for random range
+            const currentYear = new Date().getFullYear();
+            
+            // Spin the values rapidly
+            let spinCount = 0;
+            const spinInterval = setInterval(() => {
+                monthSelect.value = Math.floor(Math.random() * 12) + 1;
+                dayInput.value = Math.floor(Math.random() * 28) + 1;
+                yearInput.value = Math.floor(Math.random() * currentYear) + 1;
+                spinCount++;
+            }, 80);
+
+            // After 4 seconds, stop and land on random date
+            setTimeout(() => {
+                clearInterval(spinInterval);
+                
+                // Remove spinning class
+                monthDial.classList.remove('spinning');
+                dayDial.classList.remove('spinning');
+                yearDial.classList.remove('spinning');
+
+                // Set final random date
+                const finalMonth = Math.floor(Math.random() * 12) + 1;
+                const finalDay = Math.floor(Math.random() * 28) + 1;
+                const finalYear = Math.floor(Math.random() * currentYear) + 1;
+                
+                monthSelect.value = finalMonth;
+                dayInput.value = finalDay;
+                yearInput.value = finalYear;
+
+                // Show flashing prompt
+                datePrompt.classList.add('visible');
+            }, 4000);
+        }
+
+        // Start slot machine on page load
+        startSlotMachine();
+
         function formatDate(month, day, year) {
             const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             return `${months[month - 1]} ${day}, ${year}`;
@@ -1417,6 +1504,8 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             document.getElementById('month').value = month;
             document.getElementById('day').value = day;
             document.getElementById('year').value = year;
+            // Hide prompt when user selects an era
+            document.getElementById('datePrompt').classList.remove('visible');
         }
 
         async function activateTimeMachine() {
