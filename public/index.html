@@ -349,7 +349,7 @@
             height: 100%;
             background: linear-gradient(90deg, var(--rust), var(--gold));
             width: 0%;
-            animation: progress 18s linear infinite;
+            animation: progress 30s linear infinite;
         }
 
         @keyframes progress {
@@ -1397,14 +1397,14 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             
             questionText.style.animation = 'fadeInQuestion 2s ease-in-out';
             answerText.style.animation = 'scrollUpAnswer 4s ease-out forwards';
-            progressBar.style.animation = 'progress 18s linear';
+            progressBar.style.animation = 'progress 30s linear';
             
             qaIndex = (qaIndex + 1) % historicalQA.length;
         }
 
         // Initialize Q&A rotation
         rotateQA();
-        setInterval(rotateQA, 18000);
+        setInterval(rotateQA, 30000);
 
         initVisitorCounter();
 
