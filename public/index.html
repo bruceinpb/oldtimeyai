@@ -30,7 +30,6 @@
             overflow-x: hidden;
         }
 
-        /* Hero Section */
         .hero {
             min-height: 100vh;
             background: 
@@ -46,7 +45,6 @@
             padding: 40px 20px;
         }
 
-        /* Animated particles */
         .particles {
             position: fixed;
             top: 0;
@@ -86,7 +84,6 @@
             100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
         }
 
-        /* Decorative gear */
         .gear {
             position: fixed;
             color: var(--gold);
@@ -106,13 +103,12 @@
         }
 
         .container {
-            max-width: 1100px;
+            max-width: 1400px;
             margin: 0 auto;
             position: relative;
             z-index: 10;
         }
 
-        /* Main title */
         .title-container {
             text-align: center;
             margin-bottom: 20px;
@@ -161,7 +157,6 @@
             margin-top: 15px;
         }
 
-        /* Decorative line */
         .deco-line {
             display: flex;
             align-items: center;
@@ -179,7 +174,6 @@
             background: linear-gradient(90deg, transparent, var(--gold), transparent);
         }
 
-        /* Image gallery - vintage cards */
         .gallery {
             display: flex;
             justify-content: center;
@@ -190,8 +184,8 @@
         }
 
         .vintage-card {
-            width: 160px;
-            height: 200px;
+            width: 140px;
+            height: 175px;
             position: relative;
             transform-style: preserve-3d;
             transition: transform 0.6s;
@@ -209,7 +203,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            border: 8px solid var(--sepia);
+            border: 6px solid var(--sepia);
             border-radius: 5px;
             box-shadow: 
                 inset 0 0 20px rgba(0,0,0,0.5),
@@ -228,29 +222,147 @@
 
         .vintage-card .card-label {
             position: absolute;
-            bottom: 15px;
+            bottom: 12px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(26, 15, 10, 0.9);
             color: var(--gold);
-            padding: 8px 15px;
+            padding: 6px 12px;
             font-family: 'Special Elite', monospace;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             letter-spacing: 1px;
             white-space: nowrap;
             z-index: 3;
             border: 1px solid var(--gold);
         }
 
-        /* Date selector - steampunk style */
+        /* Main layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 30px;
+            margin: 30px 0;
+            align-items: start;
+        }
+
+        /* Historical Q&A Sidebar */
+        .qa-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .qa-box {
+            background: linear-gradient(135deg, var(--aged-paper) 0%, var(--parchment) 50%, var(--aged-paper) 100%);
+            border: 3px solid var(--sepia);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.4),
+                inset 0 0 50px rgba(139, 69, 19, 0.15);
+        }
+
+        .qa-header {
+            background: linear-gradient(135deg, var(--ink) 0%, var(--deep-brown) 100%);
+            color: var(--gold);
+            padding: 12px 15px;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.75rem;
+            text-align: center;
+            letter-spacing: 1px;
+            border-bottom: 2px solid var(--sepia);
+        }
+
+        .qa-header .year {
+            color: var(--cream);
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .qa-content {
+            padding: 20px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .question-box .qa-content {
+            min-height: 100px;
+            align-items: center;
+        }
+
+        .answer-box .qa-content {
+            min-height: 320px;
+            max-height: 320px;
+            overflow: hidden;
+        }
+
+        .qa-text {
+            font-family: 'Libre Baskerville', serif;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--ink);
+            text-align: center;
+            font-style: italic;
+        }
+
+        .question-box .qa-text {
+            animation: fadeInQuestion 2s ease-in-out;
+        }
+
+        .answer-box .qa-text {
+            text-align: left;
+            font-style: normal;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            animation: scrollUpAnswer 4s ease-out forwards;
+        }
+
+        @keyframes fadeInQuestion {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes scrollUpAnswer {
+            0% { opacity: 0; transform: translateY(50px); }
+            20% { opacity: 1; }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .qa-footer {
+            background: var(--sepia);
+            color: var(--cream);
+            padding: 8px;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.65rem;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .qa-progress {
+            height: 4px;
+            background: var(--aged-paper);
+            overflow: hidden;
+        }
+
+        .qa-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--rust), var(--gold));
+            width: 0%;
+            animation: progress 18s linear infinite;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        /* Date Machine */
         .date-machine {
-            background: 
-                linear-gradient(135deg, var(--aged-paper) 0%, var(--parchment) 50%, var(--aged-paper) 100%);
+            background: linear-gradient(135deg, var(--aged-paper) 0%, var(--parchment) 50%, var(--aged-paper) 100%);
             border: 4px solid var(--sepia);
             border-radius: 20px;
             padding: 50px 40px;
-            max-width: 700px;
-            margin: 30px auto;
             position: relative;
             box-shadow: 
                 0 20px 60px rgba(0,0,0,0.5),
@@ -296,9 +408,6 @@
             font-style: italic;
             margin-bottom: 30px;
             line-height: 1.6;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
         }
 
         .date-dials {
@@ -353,7 +462,6 @@
         .dial input[type="number"] { width: 100px; }
         .dial select { width: 180px; cursor: pointer; }
 
-        /* Activate button */
         .activate-btn {
             display: block;
             margin: 0 auto;
@@ -388,21 +496,16 @@
 
         .activate-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 
-                0 9px 0 #4a1200,
-                0 15px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 9px 0 #4a1200, 0 15px 40px rgba(0,0,0,0.5);
         }
 
         .activate-btn:hover::before { left: 100%; }
 
         .activate-btn:active {
             transform: translateY(3px);
-            box-shadow: 
-                0 3px 0 #4a1200,
-                0 5px 20px rgba(0,0,0,0.4);
+            box-shadow: 0 3px 0 #4a1200, 0 5px 20px rgba(0,0,0,0.4);
         }
 
-        /* Era quick buttons */
         .era-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -431,12 +534,11 @@
             transform: scale(1.05);
         }
 
-        /* Main content layout with sidebar */
+        /* Main content with sidebar (after activation) */
         .main-content {
             display: none;
             gap: 25px;
             margin-top: 30px;
-            max-width: 1100px;
         }
 
         .main-content.active {
@@ -450,7 +552,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Sidebar styles */
         .sidebar {
             background: linear-gradient(135deg, var(--cream) 0%, var(--aged-paper) 100%);
             border: 2px solid var(--sepia);
@@ -574,7 +675,6 @@
             40% { transform: scale(1); }
         }
 
-        /* Chat section */
         .chat-section {
             display: flex;
             flex-direction: column;
@@ -735,7 +835,6 @@
             color: var(--deep-brown);
         }
 
-        /* Visitor Counter */
         .visitor-section {
             text-align: center;
             margin: 50px 0 30px;
@@ -773,7 +872,6 @@
                 3px 3px 0 var(--gold);
         }
 
-        /* Story Modal */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -846,7 +944,6 @@
             font-family: 'Special Elite', monospace;
         }
 
-        /* Footer */
         footer {
             text-align: center;
             padding: 30px 20px;
@@ -856,7 +953,19 @@
             opacity: 0.7;
         }
 
-        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                max-width: 700px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .qa-sidebar {
+                order: -1;
+            }
+        }
+
         @media (max-width: 900px) {
             .main-content.active {
                 grid-template-columns: 1fr;
@@ -869,16 +978,15 @@
         }
 
         @media (max-width: 768px) {
-            .gallery { gap: 15px; }
+            .gallery { gap: 10px; }
             
             .vintage-card {
-                width: 140px;
-                height: 180px;
+                width: 120px;
+                height: 150px;
             }
 
             .date-machine {
                 padding: 40px 20px;
-                margin: 30px 15px;
             }
 
             .date-dials {
@@ -897,11 +1005,15 @@
             .visitor-counter .count {
                 font-size: 3rem;
             }
+
+            .answer-box .qa-content {
+                min-height: 280px;
+                max-height: 280px;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Floating particles -->
     <div class="particles">
         <div class="particle"></div>
         <div class="particle"></div>
@@ -915,7 +1027,6 @@
         <div class="particle"></div>
     </div>
 
-    <!-- Decorative gears -->
     <div class="gear gear-1">⚙</div>
     <div class="gear gear-2">⚙</div>
     <div class="gear gear-3">⚙</div>
@@ -931,7 +1042,6 @@
 
             <div class="deco-line">⚜</div>
 
-            <!-- Vintage card gallery -->
             <div class="gallery">
                 <div class="vintage-card">
                     <img src="https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop" alt="Ancient ruins">
@@ -951,57 +1061,88 @@
                 </div>
             </div>
 
-            <!-- Date Machine -->
-            <div class="date-machine" id="dateSection">
-                <h2 class="machine-title">⚙ Set Your Knowledge Cutoff Date ⚙</h2>
-                <p class="machine-desc">
-                    Choose any date in history, and the AI shall possess no knowledge of events, 
-                    discoveries, or happenings beyond that momentous day.
-                </p>
+            <!-- Main Layout with Q&A Sidebar -->
+            <div class="main-layout">
+                <div class="qa-sidebar">
+                    <div class="qa-box question-box">
+                        <div class="qa-header">
+                            📜 Past Question from <span class="year" id="questionYear">1665</span>
+                        </div>
+                        <div class="qa-content">
+                            <p class="qa-text" id="questionText">"My wife talks constantly and I do not like her ceaseless complaining. Should I hire a witch to vex her into silence?"</p>
+                        </div>
+                        <div class="qa-progress">
+                            <div class="qa-progress-bar" id="progressBar"></div>
+                        </div>
+                    </div>
 
-                <div class="date-dials">
-                    <div class="dial">
-                        <label>Month</label>
-                        <select id="month">
-                            <option value="1">January</option>
-                            <option value="2">February</option>
-                            <option value="3">March</option>
-                            <option value="4">April</option>
-                            <option value="5">May</option>
-                            <option value="6">June</option>
-                            <option value="7">July</option>
-                            <option value="8">August</option>
-                            <option value="9">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12" selected>December</option>
-                        </select>
-                    </div>
-                    <div class="dial">
-                        <label>Day</label>
-                        <input type="number" id="day" value="4" min="1" max="31">
-                    </div>
-                    <div class="dial">
-                        <label>Year</label>
-                        <input type="number" id="year" value="1955" min="1" max="2025">
+                    <div class="qa-box answer-box">
+                        <div class="qa-header">
+                            🪶 The Best Answer AI Could Give in <span class="year" id="answerYear">1665</span>
+                        </div>
+                        <div class="qa-content">
+                            <p class="qa-text" id="answerText">Good sir, I must counsel thee against such dark arts, for the hiring of witches brings naught but trouble with the local magistrates, and thy purse shall suffer greatly in bribes.
+
+Instead, consider these remedies approved by learned physicians: A daily tonic of chamomile tea administered to thy wife may calm her humours.
+
+Remember: A quiet home is a blessing, but a home free of witch trials is worth its weight in gold!</p>
+                        </div>
+                        <div class="qa-footer">
+                            ✦ WISDOM FROM THE AGES ✦
+                        </div>
                     </div>
                 </div>
 
-                <button class="activate-btn" onclick="activateTimeMachine()">⚙ Activate Time Machine ⚙</button>
+                <div class="date-machine" id="dateSection">
+                    <h2 class="machine-title">⚙ Set Your Knowledge Cutoff Date ⚙</h2>
+                    <p class="machine-desc">
+                        Choose any date in history, and the AI shall possess no knowledge of events, 
+                        discoveries, or happenings beyond that momentous day.
+                    </p>
 
-                <div class="era-buttons">
-                    <button class="era-btn" onclick="setEra(7, 4, 1776)">🇺🇸 American Revolution</button>
-                    <button class="era-btn" onclick="setEra(6, 28, 1914)">⚔️ WWI Begins</button>
-                    <button class="era-btn" onclick="setEra(7, 20, 1969)">🚀 Moon Landing</button>
-                    <button class="era-btn" onclick="setEra(11, 9, 1989)">🧱 Berlin Wall Falls</button>
-                    <button class="era-btn" onclick="setEra(1, 1, 1900)">🎩 Turn of Century</button>
-                    <button class="era-btn" onclick="setEra(12, 7, 1941)">💥 Pearl Harbor</button>
+                    <div class="date-dials">
+                        <div class="dial">
+                            <label>Month</label>
+                            <select id="month">
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12" selected>December</option>
+                            </select>
+                        </div>
+                        <div class="dial">
+                            <label>Day</label>
+                            <input type="number" id="day" value="4" min="1" max="31">
+                        </div>
+                        <div class="dial">
+                            <label>Year</label>
+                            <input type="number" id="year" value="1955" min="1" max="2025">
+                        </div>
+                    </div>
+
+                    <button class="activate-btn" onclick="activateTimeMachine()">⚙ Activate Time Machine ⚙</button>
+
+                    <div class="era-buttons">
+                        <button class="era-btn" onclick="setEra(7, 4, 1776)">🇺🇸 American Revolution</button>
+                        <button class="era-btn" onclick="setEra(6, 28, 1914)">⚔️ WWI Begins</button>
+                        <button class="era-btn" onclick="setEra(7, 20, 1969)">🚀 Moon Landing</button>
+                        <button class="era-btn" onclick="setEra(11, 9, 1989)">🧱 Berlin Wall Falls</button>
+                        <button class="era-btn" onclick="setEra(1, 1, 1900)">🎩 Turn of Century</button>
+                        <button class="era-btn" onclick="setEra(12, 7, 1941)">💥 Pearl Harbor</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Main content with sidebar -->
+            <!-- Main content with sidebar (shown after activation) -->
             <div class="main-content" id="mainContent">
-                <!-- Sidebar with historical events -->
                 <aside class="sidebar" id="sidebar">
                     <h3 class="sidebar-title">📰 Headlines of the Day</h3>
                     <p class="sidebar-subtitle">Click to read the full story</p>
@@ -1018,7 +1159,6 @@
                     <div id="comingSoonContainer"></div>
                 </aside>
 
-                <!-- Chat section -->
                 <div class="chat-section">
                     <div class="time-badge">
                         AI Knowledge Limited To: <span id="cutoffDisplay"></span>
@@ -1041,7 +1181,6 @@
                 </div>
             </div>
 
-            <!-- Visitor Counter -->
             <div class="visitor-section">
                 <div class="visitor-counter">
                     <span class="label">🎩 Time Travelers Who Have Visited</span>
@@ -1055,7 +1194,6 @@
         </div>
     </section>
 
-    <!-- Story Modal -->
     <div class="modal-overlay" id="storyModal">
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -1075,8 +1213,100 @@
         let cutoffDate = null;
         let conversationHistory = [];
         let currentEvents = [];
+        let qaIndex = 0;
 
-        // Initialize visitor counter on page load
+        // 100 Funny Historical Q&As
+        const historicalQA = [
+            { year: 1665, question: "My wife talks constantly and I do not like her ceaseless complaining. Should I hire a witch to vex her into silence?", answer: "Good sir, I must counsel thee against such dark arts, for the hiring of witches brings naught but trouble with the local magistrates, and thy purse shall suffer greatly in bribes.\n\nInstead, consider these remedies approved by learned physicians: A daily tonic of chamomile tea may calm her humours. Many men of standing have found success in simply nodding vigorously whilst thinking of other matters entirely.\n\nRemember: A quiet home is a blessing, but a home free of witch trials is worth its weight in gold!" },
+            { year: 1850, question: "I wish to travel from New York to California with great haste. What is the fastest method?", answer: "Sir, you have several options, though none could be called truly 'hasty.'\n\nThe overland route by wagon train shall consume 4 to 6 months, assuming you survive the dysentery, hostile encounters, and cholera.\n\nAlternatively, sail around Cape Horn—a mere 6 months where you shall only occasionally fear for your life during storms.\n\nMy recommendation? Write a letter instead. It arrives in merely 25 days, and you remain safely alive!" },
+            { year: 1905, question: "I have invested my entire fortune in horse carriage manufacturing. Is this wise?", answer: "Capital decision, good sir! The horse carriage industry is the backbone of modern transportation!\n\nThese 'horseless carriages' are nothing but expensive toys for eccentric millionaires. They are loud, unreliable, and require specialized fuel nearly impossible to obtain.\n\nA horse feeds itself from any meadow and has been perfected by the Almighty over thousands of years.\n\nYour great-grandchildren shall still ride in horse-drawn carriages. Your investment is as sound as the Bank of England!" },
+            { year: 1995, question: "My son spends hours on 'the Internet.' Should I be concerned about this passing fad?", answer: "Your concern is understandable but likely overblown. This 'Internet' is primarily used by academics to share research papers.\n\nThe average person has no practical use for such technology. Why send 'electronic mail' when the postal service delivers reliably within a week?\n\nMost experts predict the Internet will remain a niche curiosity, like the laser disc.\n\nLimit his usage to one hour daily, then encourage productive hobbies—like collecting Beanie Babies. Now THERE is an investment!" },
+            { year: 1912, question: "I am booking passage on the Titanic. Is it truly as safe as they claim?", answer: "My dear fellow, you could not choose a safer vessel! The RMS Titanic represents the absolute pinnacle of British maritime engineering.\n\nThe ship features sixteen watertight compartments that render it quite literally UNSINKABLE. This is scientific fact confirmed by the finest naval engineers.\n\nThe only danger aboard Titanic is overindulgence at the magnificent buffets! Book with supreme confidence, sir. Nothing could possibly go wrong." },
+            { year: 1630, question: "My neighbor possesses a black cat and speaks to herself. Should I report her as a witch?", answer: "A most prudent inquiry! However, I must advise caution in such accusations.\n\nBlack cats alone do not a witch make—perhaps she simply has poor taste in pets. Speaking to oneself is common among the elderly and the lonely.\n\nBefore reporting, consider: Does she float in water? Does milk curdle in her presence? Has she been seen flying upon a broomstick?\n\nWithout at least two of these signs, you may find yourself paying her legal fees when the magistrate dismisses the case!" },
+            { year: 1888, question: "I am considering installing one of those newfangled 'electric lights' in my home. Are they safe?", answer: "Sir, I must strongly caution you against such reckless modernization!\n\nElectric lighting is a dangerous novelty that shall surely burn down your home. The wires carry invisible fire that can strike at any moment!\n\nGas lamps have served humanity faithfully for decades. Yes, they occasionally explode and cause fires, but at least we understand that danger.\n\nMark my words: electricity is a passing fancy. Within ten years, we shall all return to sensible candles and oil lamps." },
+            { year: 1928, question: "Should I invest my life savings in the stock market? It seems one cannot lose!", answer: "What an excellent time to invest! The market has been climbing steadily for years, and all signs point to continued prosperity.\n\nSome pessimists speak of 'speculation' and 'bubbles,' but these are merely jealous souls who missed the opportunity.\n\nI recommend investing everything you have—mortgage your home if necessary! Stocks like RCA and General Motors can only go up.\n\nThis prosperity shall last forever. A crash? Preposterous! That could never happen in America." },
+            { year: 1876, question: "My colleague Mr. Bell claims to have invented a device for speaking across great distances. Is he mad?", answer: "I fear your colleague has taken leave of his senses entirely.\n\nSpeaking through wires? The very notion defies all known principles of natural philosophy! Sound requires air to travel—everyone knows this.\n\nEven if such a contraption were possible, who would want it? We have perfectly good messenger boys and the telegraph for urgent matters.\n\nI predict this 'telephone' will be remembered as one of the great follies of our age, alongside perpetual motion machines." },
+            { year: 1440, question: "A German fellow named Gutenberg claims he can make books without scribes. Should I invest?", answer: "Ha! What nonsense! Books have been copied by learned monks for a thousand years, and so it shall remain.\n\nThis 'printing press' is surely the work of the devil—or at minimum, a scheme to defraud investors.\n\nConsider: Who would trust words stamped by a machine over those lovingly copied by holy men? The very idea is sacrilege!\n\nInvest your coins in something sensible, like land or a good suit of armor." },
+            { year: 1960, question: "The President says we shall go to the moon. Is this not a waste of money?", answer: "While President Kennedy's ambitions are admirable, I must confess some skepticism.\n\nThe moon is nearly 240,000 miles away! Our rockets can barely reach a few hundred miles altitude. The mathematics simply do not support such a journey within this decade.\n\nMoreover, what would we do upon the moon? There are no resources there, no air, no water. It is a barren rock.\n\nI predict we shall abandon this foolishness within a few years and focus on sensible terrestrial matters." },
+            { year: 1985, question: "My company wishes to purchase 'personal computers' for every employee. Is this necessary?", answer: "What an extraordinary waste of money! A personal computer costs thousands of dollars and does nothing a good secretary cannot do better.\n\nThese machines are toys for hobbyists and engineers. The average office worker has no use for such complexity.\n\nMoreover, who would want to type their own letters? That is what secretarial pools are for!\n\nI predict personal computers will remain a niche product. Most businesses will never need more than five or six mainframes." },
+            { year: 1790, question: "Should I continue to use leeches for my ailments, or try this new 'vaccination'?", answer: "Leeches have served humanity for thousands of years! They balance the humours and draw out bad blood.\n\nThis 'vaccination' involves deliberately infecting oneself with cowpox? Madness! You might grow horns or develop bovine tendencies!\n\nDr. Jenner may mean well, but his methods are untested and frankly disturbing. What next—eating mold to cure infections?\n\nStick with proven remedies: bleeding, purging, and the occasional mercury tonic." },
+            { year: 1903, question: "Two bicycle mechanics claim they have achieved powered flight. Should I believe this?", answer: "The Wright brothers? Those fellows from Ohio? I've heard of their experiments, and I must say they strain credulity.\n\nPowered flight has been the dream of madmen for centuries. If God intended man to fly, He would have given us wings!\n\nBesides, what practical use could flight have? A machine that carries one or two people for a few hundred feet? Hardly revolutionary.\n\nI give this 'aviation' fad five years at most before it is forgotten entirely." },
+            { year: 1955, question: "My doctor recommends I take up cigarette smoking for my nerves. Is this sound advice?", answer: "Absolutely! Modern medicine has confirmed that cigarette smoking calms the nerves and aids digestion.\n\nMany physicians themselves smoke, and they recommend specific brands for throat health. 'More doctors smoke Camels than any other cigarette!'\n\nSmoking is also an excellent way to maintain a slim figure—much healthier than overeating.\n\nI see no reason why cigarettes would ever be considered harmful. They are a gift of modern science!" },
+            { year: 1835, question: "I am told the Earth is millions of years old. But the Bible says 6,000. Who is correct?", answer: "The Bible is the inerrant word of God, and thus the Earth is precisely 6,000 years old, as Archbishop Ussher calculated.\n\nThese geologists who speak of 'millions of years' are clearly confused by their rocks and fossils. Perhaps Satan placed those there to test our faith!\n\nThe idea that creatures could change over time—'evolution,' some call it—is clearly absurd. A dog has always been a dog, and a finch a finch.\n\nTrust in scripture, not in the speculations of natural philosophers." },
+            { year: 1970, question: "My wife wishes to open her own bank account. Should I permit this?", answer: "A woman with her own bank account? How irregular!\n\nWhile some progressive states now permit this, I would counsel caution. Women are naturally unsuited to financial matters—their delicate constitutions cannot handle such stress.\n\nMoreover, if she controls her own money, she may develop dangerous ideas about independence!\n\nI suggest instead that you provide her a generous household allowance. This has worked for centuries and shall work for centuries more." },
+            { year: 1520, question: "A sailor claims the Earth is round and he can sail west to reach the East. Pure lunacy?", answer: "While it is true that learned men have known the Earth to be spherical since ancient times, sailing WEST to reach the EAST?\n\nThe voyage would take months across open ocean! No ship carries enough provisions, and sea monsters surely lurk in those uncharted waters.\n\nMoreover, even if one survived, the eastern kingdoms have little of value—merely spices, silk, and gold. Hardly worth such risk!\n\nThis Columbus fellow will sail off the edge of the known world and never return. Mark my words." },
+            { year: 1997, question: "A company called 'Amazon' sells only books through computers. Will this work?", answer: "Selling books through the Internet? What a peculiar business model!\n\nPeople enjoy browsing bookshops, feeling the pages, chatting with knowledgeable clerks. Why would anyone order a book they cannot examine first?\n\nMoreover, shipping costs will eat into any savings. Barnes & Noble and Borders have nothing to fear from this novelty.\n\nI give Amazon perhaps three years before it joins the growing list of Internet failures. Books will always be sold in stores." },
+            { year: 1865, question: "President Lincoln plans to attend the theatre tonight. Should he not stay home?", answer: "Nonsense! The war is over, and the President deserves an evening of entertainment.\n\nFord's Theatre is presenting 'Our American Cousin'—a delightful comedy. The President will be perfectly safe in his private box.\n\nSome worry about assassination, but what fool would attempt such a thing in a crowded theatre? Security is quite adequate.\n\nLet the President enjoy his evening. What could possibly happen at a simple play?" },
+            { year: 1348, question: "People in my village are dying of a strange plague. How might I protect myself?", answer: "This pestilence sweeping Europe is most concerning. Here are the best protections known to modern medicine:\n\nFirst, avoid bad air (miasma) by carrying flowers or sweet-smelling herbs. The plague travels through foul odors.\n\nSecond, bleed yourself regularly to maintain proper humour balance. Third, flagellate yourself to appease God's wrath.\n\nFinally, avoid bathing—water opens the pores and allows disease entry. Many physicians have not bathed in years and remain healthy!\n\nFollowing these precautions, you should survive this temporary outbreak." },
+            { year: 1920, question: "My husband wishes to purchase an automobile. Are they not death traps?", answer: "Your caution is understandable, madam, but motorcars have become quite safe!\n\nModern vehicles can reach speeds of 30 miles per hour with minimal risk. Simply ensure your husband sounds the horn at every intersection.\n\nTrue, there are no traffic signals and few rules of the road, but common courtesy prevails among motorists.\n\nThe only real danger is frightening horses. I recommend your husband also purchase a horse, just in case the automobile proves impractical." },
+            { year: 1750, question: "I am told that diseases are caused by tiny invisible creatures. Can this be true?", answer: "Invisible creatures causing disease? What medieval superstition is this?\n\nEvery educated physician knows that disease arises from imbalanced humours and bad air. This has been established since the time of Galen!\n\n'Animalcules' observed under microscopes are merely curiosities—debris floating in bodily fluids. They cannot possibly cause illness.\n\nIf tiny creatures caused disease, wouldn't we see them? This 'germ theory' will be forgotten within a generation." },
+            { year: 1885, question: "A doctor wishes to operate on me while I breathe some vapor. Is this safe?", answer: "Anesthesia is a marvelous modern invention! No longer must patients bite leather straps during surgery.\n\nThe ether or chloroform will render you completely insensible to pain. When you awake, the operation will be complete!\n\nSome patients never awake, of course, but this is rare—perhaps only one in twenty. Those are excellent odds!\n\nI recommend you also write a will beforehand, not because you expect to die, but merely as sensible precaution." },
+            { year: 2005, question: "My son wishes to create 'videos' and post them on something called 'YouTube.' Is this a good career?", answer: "Creating videos for the Internet? What a waste of time!\n\nYouTube is a website where people share home movies of their cats and children. There is no money to be made in such frivolity.\n\nReal careers are in stable industries like newspapers, video rental stores, and encyclopedia sales. These fields shall always need workers.\n\nEncourage your son to pursue something practical. 'Internet celebrity' is not a real profession." },
+            { year: 1840, question: "I am told that surgeons should wash their hands between patients. Is this necessary?", answer: "Wash hands between patients? What peculiar advice!\n\nA surgeon's hands become seasoned with experience. The dried blood and matter prove he is well-practiced in his craft!\n\nThis 'hygiene' notion is an insult to the profession. Are we to believe that a gentleman's hands carry disease? Preposterous!\n\nI have operated on hundreds of patients with unwashed hands, and only about half have died of infection. Those are acceptable results." },
+            { year: 1975, question: "Should I purchase one of these new 'video cassette recorders'? They cost $1,500!", answer: "What an absurd extravagance! $1,500 to record television programs you could simply watch when they air?\n\nMoreover, Hollywood will never release films on these cassettes. Studios make their money from theatrical releases.\n\nThe VCR is a niche product for wealthy eccentrics. Most families will never need or want one.\n\nSpend your money on something sensible, like a good 8-track player. Now THAT is the future of home entertainment!" },
+            { year: 1600, question: "I hear that the Earth moves around the Sun. Should I believe this heresy?", answer: "Believe it? You should report whoever told you such dangerous nonsense!\n\nThe Earth is clearly the center of Creation. The Sun, Moon, and stars revolve around us—anyone can see this by looking up!\n\nThis Copernican theory contradicts Scripture and common sense. The Church has rightly condemned such ideas.\n\nStick with Ptolemy and Aristotle. Their teachings have guided humanity for millennia and shall continue forever." },
+            { year: 1943, question: "Should I invest in this new computing machine at IBM? It weighs 5 tons and costs millions!", answer: "While these computing machines are marvels of engineering, I see limited commercial application.\n\nThey are useful for complex military calculations, but peacetime uses are few. Perhaps large corporations might need one or two.\n\nI believe a famous IBM executive correctly estimated that the world market for computers is perhaps five machines.\n\nInvest instead in proven technologies like mechanical calculators. They shall always have a place on every accountant's desk." },
+            { year: 1815, question: "Napoleon has escaped from Elba. Should we be concerned?", answer: "Concerned? Napoleon is finished! His army is scattered, his allies have abandoned him.\n\nHe may gather a few hundred loyalists, but the combined forces of Europe shall crush him within weeks. This 'Hundred Days' will end quickly.\n\nBesides, Wellington is undefeated. Should Napoleon somehow raise an army, British forces will easily triumph.\n\nBy summer, Napoleon will be back in exile—perhaps somewhere more secure this time. Waterloo? Never heard of it." },
+            { year: 1962, question: "The Russians have placed missiles in Cuba. Will there be nuclear war?", answer: "While the situation is tense, I am confident cooler heads will prevail.\n\nNeither Khrushchev nor Kennedy desires nuclear annihilation. This is merely diplomatic posturing.\n\nModern leaders are too rational for atomic war. The missiles will be removed through negotiation, mark my words.\n\nIn the meantime, you might consider building a fallout shelter—just as a precaution. Stock it with canned goods for two weeks, perhaps." },
+            { year: 1890, question: "I have been offered shares in a company that distributes electricity. Is this sound?", answer: "Electricity? The experts are quite divided on its future.\n\nMr. Edison promotes direct current, while Mr. Westinghouse favors alternating current. This 'War of Currents' creates uncertainty.\n\nMoreover, gas lighting is well-established and reliable. Why would homes switch to dangerous, expensive electricity?\n\nI predict electricity will power factories but never replace gas in homes. Your investment is therefore risky. Proceed with caution." },
+            { year: 1770, question: "The colonists in America are restless. Will they truly rebel against the Crown?", answer: "Rebel against the British Empire? The mightiest force on Earth? Absurd!\n\nThese colonists are merchants and farmers. They have no army, no navy, no ammunition factories.\n\nEven if they attempted rebellion, His Majesty's forces would crush them within months. The very idea is laughable.\n\nA few rabble-rousers like this Adams fellow make noise, but sensible colonists remain loyal. This unrest will pass by Christmas." },
+            { year: 1980, question: "A Japanese company wishes to sell electronic 'video games.' Is this a wise import?", answer: "Video games? You mean those arcade machines that teenagers waste their coins upon?\n\nNo American family wants such frivolity in their home. Children should play outside or read books, not stare at screens!\n\nMoreover, Japanese electronics are cheap imitations of American quality. This 'Nintendo' will never compete with Atari.\n\nThe video game fad peaked last year. I predict the entire industry will collapse by 1985." },
+            { year: 1935, question: "Germany has rebuilt its military under Herr Hitler. Should Europe be concerned?", answer: "Herr Hitler is certainly bombastic, but Germany poses no real threat to European peace.\n\nThe Treaty of Versailles ensures German military weakness. Their army is ceremonial at best.\n\nMoreover, no nation wishes another Great War. The League of Nations will maintain peace through diplomacy.\n\nHitler's territorial ambitions will be satisfied with minor concessions. Appeasement is the path to lasting peace." },
+            { year: 1710, question: "My barber-surgeon recommends a mixture of mercury and arsenic for my ailment. Is this safe?", answer: "Mercury and arsenic are among the finest medicines known to the healing arts!\n\nMercury—the 'quicksilver'—has cured ailments from melancholy to French pox for centuries. Arsenic strengthens the constitution.\n\nYes, some patients experience minor side effects: hair loss, tooth decay, tremors, and occasional madness. These indicate the treatment is working!\n\nTrust your barber-surgeon. He has likely bled and poisoned hundreds of patients with excellent results." },
+            { year: 1999, question: "People say all computers will fail at midnight on January 1st. Should I panic?", answer: "The Y2K bug is a serious concern! Computers cannot handle the year 2000 and will think it is 1900.\n\nPlanes may fall from the sky! Banks may lose all records! Nuclear plants may meltdown!\n\nI recommend stockpiling food, water, and cash for at least six months. Perhaps purchase a generator and weapons for protection.\n\nThe world as we know it may end at the stroke of midnight. Prepare for the worst!" },
+            { year: 1860, question: "Mr. Darwin claims humans descended from apes. Has he gone mad?", answer: "Mr. Darwin's theory is both scientifically absurd and morally dangerous!\n\nIf humans evolved from apes, why are there still apes? Checkmate, evolutionists!\n\nMoreover, this theory undermines the moral foundation of society. If we are mere animals, what prevents us from behaving as such?\n\nDarwin's ideas will be forgotten within a decade. Creation science will always prevail." },
+            { year: 1945, question: "The Americans have dropped a terrible new bomb on Japan. Will such weapons end war forever?", answer: "The atomic bomb is indeed fearsome, but it may be a blessing in disguise!\n\nNow that nations possess such devastating weapons, no one will dare start another war. Mutual annihilation ensures peace.\n\nMoreover, atomic energy will revolutionize civilian life! Soon we shall have atomic cars, atomic planes, even atomic vacuum cleaners!\n\nI predict nuclear weapons will make war obsolete within five years. We have entered an age of permanent peace." },
+            { year: 1870, question: "Should women be permitted to attend university? My daughter wishes to study medicine.", answer: "Medicine? A woman? The very idea strains credulity!\n\nThe female brain is simply not suited for rigorous academic study. Excessive thinking diverts blood from the reproductive organs!\n\nMoreover, female doctors would upset male patients and embarrass female ones. It is against nature.\n\nEncourage your daughter toward suitable pursuits: needlework, piano, or perhaps teaching young children. Leave medicine to men." },
+            { year: 1989, question: "The Berlin Wall has fallen. Does this mean the Cold War is ending?", answer: "While the Wall's fall is dramatic, I would caution against premature celebration.\n\nThe Soviet Union remains a superpower with thousands of nuclear weapons. This may be a temporary thaw.\n\nMoreover, East Germany will struggle economically. Reunification seems unlikely within our lifetimes.\n\nThe Cold War has defined global politics for forty years. It will likely continue for forty more. Plus the Soviet Union seems quite stable." },
+            { year: 1775, question: "I have invented a machine powered by steam. Will anyone wish to purchase it?", answer: "A steam engine? What practical use could such a contraption have?\n\nThe amount of coal required would be enormous! Water wheels and horse power serve our mills perfectly well.\n\nMoreover, these machines are dangerous—boilers have been known to explode! No sensible factory owner would take such risks.\n\nStick to improving horse-drawn equipment. Steam power is an interesting novelty but has no commercial future." },
+            { year: 1910, question: "I have invented a brassiere to replace the corset. Will women adopt it?", answer: "Replace the corset? Madam, the corset has shaped feminine fashion for centuries!\n\nWomen require the support and structure that only proper corseting provides. This 'brassiere' seems flimsy and inadequate.\n\nMoreover, abandoning corsets would allow women to move too freely. This could lead to dangerous notions about athletics or employment!\n\nI predict your invention will appeal only to bohemians and suffragettes. Respectable women will always wear corsets." },
+            { year: 1830, question: "I am told that washing one's hands after using the privy prevents illness. Is this true?", answer: "What an odd notion! How could the hands carry disease from the privy?\n\nIllness comes from bad air, imbalanced humours, and divine punishment. Excrement has no connection to disease.\n\nMoreover, frequent hand washing removes the natural oils that protect the skin. You may damage your hands!\n\nThis advice sounds like something an overly fastidious housewife might invent. Ignore it and save water." },
+            { year: 1950, question: "Television is becoming popular. Will it replace radio?", answer: "Television is an amusing novelty, but it will never replace radio.\n\nWho wants to sit in a darkened room staring at a tiny screen? Radio allows one to work, read, or converse while listening.\n\nMoreover, television programming is limited to a few hours per day. Radio offers 24-hour entertainment.\n\nI predict television will remain a niche product for the wealthy. Most families will keep their radios for decades to come." },
+            { year: 1680, question: "My neighbor claims the blood circulates through the body. Is he a heretic?", answer: "The blood circulating? While Dr. Harvey published this theory some decades ago, many wise physicians remain skeptical.\n\nThe ancients taught that blood is produced by the liver and consumed by the organs. This has been known for a thousand years!\n\nHowever, since Harvey demonstrated his theory to King Charles, it has become fashionable. Your neighbor is likely not a heretic—merely confused.\n\nRegardless, continue your regular bleedings. Whether blood circulates or not, removing excess remains beneficial." },
+            { year: 1925, question: "This new 'jazz' music is corrupting our youth. Should it be banned?", answer: "Jazz is indeed a menace to civilized society! Its syncopated rhythms and improvisations appeal to base instincts.\n\nThe music originates from... shall we say, questionable sources. Respectable young people should avoid it entirely.\n\nMoreover, jazz encourages inappropriate dancing and mixing of the races. Nothing good can come of it.\n\nI predict jazz will be forgotten within five years, replaced by proper orchestral music. We must simply wait out this unfortunate fad." },
+            { year: 1580, question: "Should I invest in Sir Walter Raleigh's expedition to find El Dorado?", answer: "El Dorado—the City of Gold! What an opportunity!\n\nThe New World is filled with riches beyond imagination. The Spanish have already plundered fortunes from the natives.\n\nSir Walter is an experienced explorer and favorite of the Queen. How could he fail?\n\nI recommend investing heavily. The returns will be astronomical when he returns laden with gold. This venture cannot possibly disappoint." },
+            { year: 1965, question: "My doctor prescribes thalidomide for my wife's morning sickness. Is this safe?", answer: "Thalidomide is the wonder drug of our age! It relieves nausea, promotes sleep, and has virtually no side effects.\n\nUnlike barbiturates, thalidomide is nearly impossible to overdose on. It is the safest sedative ever developed.\n\nDoctors across Europe have prescribed it to thousands of pregnant women with excellent results.\n\nYour wife should take it without worry. The pharmaceutical industry has thoroughly tested this medication." },
+            { year: 1895, question: "A Frenchman claims to have captured images that move. Is this possible?", answer: "Moving pictures? The Lumière brothers have indeed demonstrated a curious device, but practical applications escape me.\n\nWho would pay to watch people moving on a screen when they could attend a proper theatre with live actors?\n\nMoreover, these 'films' last merely seconds. One could not tell a story in such brief duration.\n\nI give this cinematograph perhaps two years as a carnival novelty before the public loses interest." },
+            { year: 1805, question: "Admiral Nelson sails to confront the French fleet at Trafalgar. Will he prevail?", answer: "Admiral Nelson is Britain's finest commander, and our navy rules the waves!\n\nThe combined French and Spanish fleet is formidable, but British seamanship and gunnery are unmatched.\n\nI predict a decisive victory that will secure British naval supremacy for a century. Nelson will return a hero!\n\nHis bold tactics may put him in personal danger, but surely Providence protects such a great man. What could go wrong?" },
+            { year: 1940, question: "France has fallen to Germany in mere weeks. Is Britain next?", answer: "The situation is grave, but Britain shall never fall!\n\nThe English Channel has protected our islands for a thousand years. The German navy cannot match the Royal Navy.\n\nMoreover, the RAF will contest any aerial invasion. Our Spitfires and Hurricanes are superior to German aircraft.\n\nWe shall fight on the beaches, in the fields, and in the streets. I predict Hitler will abandon his invasion plans within months." },
+            { year: 1720, question: "I have invested heavily in the South Sea Company. My wealth has tripled! Should I invest more?", answer: "The South Sea Company is the soundest investment in the realm! Stock prices have risen from £100 to £1,000 in mere months.\n\nThe company has exclusive trading rights with Spanish America. Profits will be unlimited!\n\nSome doomsayers speak of a 'bubble,' but they are merely jealous. This growth will continue forever.\n\nMortgage your estate if necessary! Such an opportunity comes once in a lifetime. You cannot possibly lose." },
+            { year: 1885, question: "My physician recommends cocaine for my fatigue and depression. Is this wise?", answer: "Cocaine is truly a miracle of modern medicine! Dr. Freud himself has written extensively on its benefits.\n\nIt cures depression, fatigue, morphine addiction, and even toothache. There are no known drawbacks!\n\nThe coca leaf has been used safely for centuries in South America. Now science has refined its essence for our benefit.\n\nI recommend taking cocaine daily. It will improve your work performance and social disposition. What could go wrong?" },
+            { year: 1760, question: "I am told that lightning is electricity. Can this be captured?", answer: "Mr. Franklin's experiments with lightning are fascinating but impractical.\n\nYes, lightning appears to be electrical in nature, but capturing it? To what end?\n\nElectricity is a parlor trick—useful for making hair stand on end and nothing more. It has no practical application.\n\nPerhaps in a hundred years we might power a small lamp with electricity, but replacing gas lighting? Impossible." },
+            { year: 1982, question: "Should I purchase one of these 'compact disc' players? They cost $1,000!", answer: "Compact discs? What a waste of money!\n\nVinyl records have served music lovers for a century. They produce warm, authentic sound that digital cannot match.\n\nMoreover, CDs scratch easily and skip. Records are far more durable. And have you seen how small the album art is?\n\nThe CD is a fad for technology enthusiasts. Records and cassettes will remain dominant. Save your money." },
+            { year: 1350, question: "Should I flee the city to escape the plague, or trust in God's protection?", answer: "This is a grave theological question. The plague is surely God's punishment for mankind's sins.\n\nFleeing may save your body but damn your soul—are you not accepting God's judgment by running?\n\nHowever, many saints advise that God helps those who help themselves. Perhaps retreat to the countryside until His wrath passes.\n\nOr stay and pray constantly. Either way, avoid bathing—water spreads the pestilence through open pores." },
+            { year: 1913, question: "I am offered a position at a 'moving assembly line' factory. Is this the future?", answer: "Mr. Ford's assembly line is revolutionary but dehumanizing!\n\nMen become mere extensions of machines, performing the same task a thousand times daily. What of craftsmanship? Of pride in one's work?\n\nMoreover, this method will create unemployment. If cars are produced so quickly, fewer workers will be needed.\n\nI predict the assembly line will be abandoned within a decade as workers demand better conditions." },
+            { year: 1855, question: "My son wishes to travel to California to mine for gold. Should I permit this?", answer: "The Gold Rush ended years ago! By now, the easy pickings have been claimed by earlier prospectors.\n\nYour son would spend months traveling west only to find barren claims and broken dreams.\n\nMoreover, California is a lawless wilderness full of bandits and desperados. Many young men have perished there.\n\nEncourage him to remain home and learn a respectable trade. Blacksmithing or cooperage offer steady employment." },
+            { year: 1987, question: "A company called Microsoft has gone public. Their stock seems overpriced at $21. Should I invest?", answer: "Microsoft makes software for personal computers—a niche market at best.\n\nIBM controls the computer industry. These small software companies come and go like summer flies.\n\nMoreover, Mr. Gates is barely thirty years old. Can such a young man truly lead a major corporation?\n\nI recommend investing in established companies like Kodak or Sears. They will outlast any software fad." },
+            { year: 1400, question: "I am told the world contains continents beyond Europe, Africa, and Asia. Can this be true?", answer: "The learned scholars of antiquity mapped the entire world thousands of years ago. There is nothing beyond the known continents.\n\nSome speak of islands in the western ocean, but these are merely sailors' tales—probably the same islands described by Plato.\n\nThe ocean beyond the Pillars of Hercules is called 'Mare Tenebrosum' for good reason—it is dark, endless, and full of monsters.\n\nAnyone who sails west will find only death. Trust the ancients!" },
+            { year: 1936, question: "Germany will host the Olympic Games. Should we participate?", answer: "The Berlin Olympics present a splendid opportunity for international fellowship!\n\nHerr Hitler has promised that all athletes will be treated equally, regardless of race. Germany is on its best behavior.\n\nMoreover, sport should remain separate from politics. The Olympics promote peace and understanding among nations.\n\nI see no reason for concern. Germany is merely hosting an athletic competition, not advancing any particular agenda." },
+            { year: 1820, question: "I have heard of a device that preserves food in sealed tin containers. Can this be safe?", answer: "Sealing food in metal containers? What a peculiar notion!\n\nFood is preserved through salt, smoke, and drying—methods proven over millennia. Why trust new-fangled technology?\n\nMoreover, metal containers may poison the food. The acids in meat and vegetables could react dangerously.\n\nI predict these 'tin cans' will cause illness and death. Stick with traditional preservation methods." },
+            { year: 1505, question: "Is it wise to send my son to study at this new 'university' in Wittenberg?", answer: "Wittenberg is a fine new university, founded by the wise Elector Frederick!\n\nThe faculty includes excellent scholars in theology and philosophy. Your son will receive a proper Catholic education.\n\nI hear they recently hired a young professor of theology named Martin Luther. By all accounts, a most devout and orthodox monk.\n\nSend your son with confidence. What could a quiet professor of theology possibly do to disrupt the Church?" },
+            { year: 1929, question: "The stock market has been falling for weeks. Should I sell my shares?", answer: "Sell? Absolutely not! This is merely a temporary correction.\n\nThe market has risen for years on the strength of American industry. A few weeks of decline mean nothing.\n\nIn fact, this is an excellent opportunity to buy more shares at reduced prices! The market always recovers.\n\nPresident Hoover assures us prosperity is just around the corner. By Christmas, your investments will reach new heights!" },
+            { year: 1790, question: "The French have overthrown their king. Could such revolution happen here in England?", answer: "What transpires in France is tragic but uniquely French.\n\nEngland had its revolution in 1688—we settled our constitutional questions peacefully with the Glorious Revolution.\n\nOur Parliament represents the people, our monarchy is limited, and our rights are guaranteed. Englishmen have no cause for revolt.\n\nBesides, the French revolutionaries will soon tire of chaos and restore the monarchy. Such upheavals never last." },
+            { year: 1958, question: "I am told a new 'credit card' allows purchases without cash. Is this not dangerous?", answer: "Purchasing goods without money in hand? What could possibly go wrong!\n\nThis 'credit card' encourages spending beyond one's means. It is a recipe for personal financial disaster.\n\nMoreover, no merchant will accept a small plastic card in place of honest currency. The system is impractical.\n\nI predict credit cards will be abandoned within five years. Americans prefer to pay cash for their purchases." },
+            { year: 1665, question: "The Great Fire approaches my street. Should I stay to protect my property?", answer: "A reasonable question in these troubling times.\n\nThe fire brigades are doing their utmost, and the Lord Mayor has the situation well in hand.\n\nHowever, material possessions can be replaced—your life cannot. If the flames approach, flee immediately!\n\nTake your most valuable documents and family heirlooms. Leave furniture and ordinary goods. London will rebuild, but you cannot be resurrected." },
+            { year: 1900, question: "Should I invest in this new 'Eastman Kodak' company that sells camera equipment?", answer: "Kodak produces cameras and film for amateur photographers—a lovely hobby but limited market.\n\nMost people prefer to hire professional photographers for portraits. Why would ordinary folk take their own pictures?\n\nMoreover, the photography market will saturate quickly. How many cameras does one family need?\n\nI give Kodak perhaps twenty years before the novelty wears off. Invest in something with lasting value, like railroads." },
+            { year: 1840, question: "I have invented a machine for sewing cloth automatically. Will anyone purchase it?", answer: "A sewing machine? What need have we for such devices?\n\nSeamstresses have sewn by hand for thousands of years. The human hand produces finer work than any machine.\n\nMoreover, a machine would put countless women out of work! The social consequences would be dire.\n\nPatent your invention if you wish, but I predict no manufacturer will purchase it. Handwork will always be superior." },
+            { year: 1978, question: "I am told a 'test tube baby' has been born in England. Is this not against God's will?", answer: "In vitro fertilization is a troubling development that raises profound moral questions.\n\nMany religious authorities have condemned the procedure as unnatural interference with God's plan for procreation.\n\nMoreover, we cannot know the long-term effects. These children may be malformed or psychologically damaged.\n\nI predict society will reject this technology. Children should be conceived naturally, as God intended." },
+            { year: 1888, question: "Jack the Ripper terrorizes London. Will he ever be caught?", answer: "Scotland Yard employs the finest detectives in the world. This murderer cannot evade justice forever!\n\nModern police methods—fingerprinting, bloodhound tracking, scientific analysis—will surely identify the fiend.\n\nMoreover, the killer grows bolder with each crime. Such arrogance leads to mistakes.\n\nI predict Jack the Ripper will be apprehended within months and hanged before year's end. Justice is inevitable." },
+            { year: 1969, question: "Watching men walk on the moon seems impossible. Could this be a hoax?", answer: "I understand your skepticism—the feat does seem incredible!\n\nHowever, millions witnessed the launch, thousands of engineers worked on the project, and the Soviets are tracking the mission.\n\nFaking such an event would require more effort than actually going! The conspiracy would involve thousands of people.\n\nThis is humanity's greatest achievement. Embrace it proudly, for Americans have walked upon the moon." },
+            { year: 1925, question: "Should I purchase Florida real estate? Prices are rising rapidly!", answer: "Florida land is the opportunity of the century! Prices have doubled and redoubled in just months.\n\nThe Sunshine State offers paradise—warm weather, beautiful beaches, and endless development potential.\n\nSome speak of 'speculation,' but they are merely jealous. Florida will soon rival New York in population and prosperity.\n\nBuy now before prices rise further! This boom will continue indefinitely. A hurricane of profit awaits you!" },
+            { year: 1815, question: "My servant suggests I try this new 'rubber' material for waterproofing. Is it reliable?", answer: "Rubber is an interesting curiosity imported from South America, but impractical for serious use.\n\nIn warm weather it becomes sticky and malodorous. In cold weather it cracks and crumbles. Quite unreliable!\n\nTraditional oilskin and waxed canvas have waterproofed clothing for centuries. Why experiment with exotic materials?\n\nI predict rubber will remain a novelty for scientific demonstrations. It has no commercial future whatsoever." },
+            { year: 1975, question: "My employer wishes to install 'word processors' to replace typewriters. Is this progress?", answer: "Word processors are unnecessarily complicated machines!\n\nA skilled typist produces perfect documents on a typewriter. Why add computers to a simple task?\n\nMoreover, these machines cost tens of thousands of dollars. A good typewriter costs a few hundred at most.\n\nI predict businesses will reject word processors within five years and return to reliable typewriters." },
+            { year: 1610, question: "Galileo claims to see moons orbiting Jupiter. Is he not deceived by his telescope?", answer: "Galileo's observations are fascinating but surely mistaken.\n\nThe telescope is a new and imperfect instrument. What he sees are likely reflections or imperfections in the glass.\n\nMoreover, moons around Jupiter would contradict Aristotle and Scripture. Everything orbits Earth—this is established fact.\n\nI advise ignoring these astronomical novelties. The Church will soon correct Galileo's errors through proper instruction." },
+            { year: 1945, question: "The United Nations has been established. Will it succeed where the League of Nations failed?", answer: "The United Nations shows promise, but I have reservations.\n\nThe League of Nations failed because major powers would not cooperate. Why should the UN be different?\n\nMoreover, giving each nation one vote regardless of size seems unworkable. The Soviet Union will obstruct everything.\n\nI give the UN perhaps twenty years before it collapses into irrelevance, just like the League." },
+            { year: 1520, question: "My physician recommends trepanning to cure my headaches. Should I consent?", answer: "Trepanning—drilling a hole in the skull—has been practiced since ancient times with excellent results!\n\nThe procedure releases evil spirits and excess pressure that cause headaches. Many patients report immediate relief.\n\nYes, there is some risk of infection or death, but what medical procedure is without risk?\n\nI recommend an experienced surgeon with steady hands. The headaches will trouble you no more!" },
+            { year: 1990, question: "The Soviet Union appears to be collapsing. Is this truly happening?", answer: "While the USSR faces difficulties, reports of its collapse are premature.\n\nThe Soviet system has survived for seventy years. It will adapt and continue—perhaps with reforms, but fundamentally intact.\n\nThe Communist Party controls the army, the economy, and all institutions. How could it simply disappear?\n\nI predict the Soviet Union will still exist, perhaps in modified form, well into the 21st century. Empires do not fall overnight." },
+            { year: 1880, question: "I am told that diseases can be prevented by injecting weakened germs. This sounds backwards!", answer: "I understand your confusion! Injecting disease to prevent disease seems contradictory.\n\nYet Dr. Pasteur and Dr. Koch have demonstrated remarkable results with their 'vaccines' and 'inoculations.'\n\nThe procedure tricks the body into preparing defenses before the real disease strikes. Quite clever, actually.\n\nI cautiously recommend these new treatments. Medicine is advancing rapidly—perhaps germs do cause disease after all!" },
+            { year: 1963, question: "President Kennedy visits Dallas today. Should there be concern for his safety?", answer: "Dallas is a modern American city with professional police protection. The President travels with Secret Service.\n\nYes, some Texans oppose Kennedy's policies, but Americans do not assassinate their leaders. This is not some banana republic.\n\nThe President will wave to crowds, give speeches, and return safely to Washington. Nothing ever happens on routine political visits.\n\nEnjoy the motorcade if you can attend! It's not every day the President comes to town." },
+            { year: 1700, question: "Should I discipline my children with regular beatings, as is customary?", answer: "Spare the rod, spoil the child! This wisdom has guided parents for millennia.\n\nChildren are born with sinful natures that must be corrected through firm discipline. Beatings drive out foolishness.\n\nModern softness toward children produces weak, undisciplined adults. Your grandfather was beaten, his grandfather was beaten, and they turned out fine!\n\nBeat your children regularly, but not in anger. Calm, measured punishment builds character." },
+            { year: 1995, question: "A company called 'Google' is starting in a garage. Should I offer them funding?", answer: "Another search engine? The Internet already has Yahoo, AltaVista, and dozens of others.\n\nThe search market is saturated. There is no room for new competitors, especially one with such a silly name.\n\nMoreover, these Stanford students have no business experience. Running a company requires more than clever algorithms.\n\nInvest your money in established technology companies. This 'Google' will be forgotten within two years." },
+            { year: 1850, question: "My wife wishes to wear 'bloomers' instead of proper skirts. Should I forbid this?", answer: "Bloomers? Those Turkish-style pantaloons that some radical women are promoting?\n\nSuch attire is immodest and unfeminine! Proper ladies wear skirts that cover their ankles completely.\n\nMoreover, bloomers suggest dangerous ideas about women's equality. Next she'll want to vote!\n\nForbid this absolutely. Your wife's reputation—and yours—depends on her wearing respectable feminine attire." },
+            { year: 1930, question: "This new 'talking picture' craze seems to be ending silent films. Is this permanent?", answer: "While 'talkies' are currently popular, I predict silent films will endure.\n\nMany great actors cannot speak well—their careers depend on pantomime. Talkies are a novelty.\n\nMoreover, the technology is crude. The sound quality is poor and dialogue is often unintelligible.\n\nI predict a return to silent films within five years, perhaps with occasional 'talkie' novelties for variety." },
+            { year: 1910, question: "My daughter wishes to bob her hair short like a man. Is this acceptable?", answer: "Short hair on a woman? Absolutely not!\n\nA woman's hair is her crowning glory, as Scripture teaches. Cutting it short is practically indecent.\n\nMoreover, bobbed hair suggests masculine ambitions. Your daughter may develop unwomanly interests in careers or politics!\n\nInsist she maintain proper long hair. Short hair is a passing fad among bohemians and will never become respectable." }
+        ];
+
+        // Initialize visitor counter
         async function initVisitorCounter() {
             try {
                 if (!sessionStorage.getItem('counted')) {
@@ -1095,13 +1325,43 @@
             }
         }
 
+        // Q&A rotation
+        function rotateQA() {
+            const qa = historicalQA[qaIndex];
+            
+            document.getElementById('questionYear').textContent = qa.year;
+            document.getElementById('answerYear').textContent = qa.year;
+            document.getElementById('questionText').textContent = `"${qa.question}"`;
+            document.getElementById('answerText').textContent = qa.answer;
+            
+            // Reset animations
+            const questionText = document.getElementById('questionText');
+            const answerText = document.getElementById('answerText');
+            const progressBar = document.getElementById('progressBar');
+            
+            questionText.style.animation = 'none';
+            answerText.style.animation = 'none';
+            progressBar.style.animation = 'none';
+            
+            void questionText.offsetHeight;
+            void answerText.offsetHeight;
+            void progressBar.offsetHeight;
+            
+            questionText.style.animation = 'fadeInQuestion 2s ease-in-out';
+            answerText.style.animation = 'scrollUpAnswer 4s ease-out forwards';
+            progressBar.style.animation = 'progress 18s linear';
+            
+            qaIndex = (qaIndex + 1) % historicalQA.length;
+        }
+
+        // Initialize Q&A rotation
+        rotateQA();
+        setInterval(rotateQA, 18000);
+
         initVisitorCounter();
 
         function formatDate(month, day, year) {
-            const months = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'
-            ];
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             return `${months[month - 1]} ${day}, ${year}`;
         }
 
@@ -1126,11 +1386,10 @@
             
             document.getElementById('cutoffDisplay').textContent = formattedDate;
             document.getElementById('mainContent').classList.add('active');
-            document.getElementById('dateSection').style.display = 'none';
+            document.querySelector('.main-layout').style.display = 'none';
             
             conversationHistory = [];
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML = `
+            document.getElementById('chatBox').innerHTML = `
                 <div class="message assistant">
                     <div class="message-sender">Old Timey AI</div>
                     <div class="message-content">
@@ -1149,16 +1408,7 @@
             const eventsContainer = document.getElementById('eventsContainer');
             const comingSoonContainer = document.getElementById('comingSoonContainer');
             
-            eventsContainer.innerHTML = `
-                <div class="sidebar-loading">
-                    <p>Searching the archives...</p>
-                    <div class="loading-dots">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                    </div>
-                </div>
-            `;
+            eventsContainer.innerHTML = `<div class="sidebar-loading"><p>Searching the archives...</p><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
             comingSoonContainer.innerHTML = '';
 
             try {
@@ -1169,7 +1419,6 @@
                 });
 
                 if (!response.ok) throw new Error('Failed to fetch events');
-
                 const data = await response.json();
                 currentEvents = data.events || [];
 
@@ -1193,7 +1442,6 @@
                         </div>
                     `;
                 }
-
             } catch (error) {
                 console.error('Error fetching events:', error);
                 eventsContainer.innerHTML = '<p style="text-align:center; color: var(--rust);">Unable to retrieve historical events.</p>';
@@ -1205,23 +1453,10 @@
             if (!event) return;
 
             const modal = document.getElementById('storyModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalDate = document.getElementById('modalDate');
-            const modalStory = document.getElementById('modalStory');
-
             modal.classList.add('active');
-            modalTitle.textContent = event.title;
-            modalDate.textContent = event.date;
-            modalStory.innerHTML = `
-                <div class="modal-loading">
-                    <p>Composing the story...</p>
-                    <div class="loading-dots" style="display: inline-flex; gap: 5px; margin-top: 10px;">
-                        <div class="dot" style="width:8px;height:8px;background:var(--sepia);border-radius:50%;animation:bounce 1.4s ease-in-out infinite;"></div>
-                        <div class="dot" style="width:8px;height:8px;background:var(--sepia);border-radius:50%;animation:bounce 1.4s ease-in-out infinite;animation-delay:0.2s;"></div>
-                        <div class="dot" style="width:8px;height:8px;background:var(--sepia);border-radius:50%;animation:bounce 1.4s ease-in-out infinite;animation-delay:0.4s;"></div>
-                    </div>
-                </div>
-            `;
+            document.getElementById('modalTitle').textContent = event.title;
+            document.getElementById('modalDate').textContent = event.date;
+            document.getElementById('modalStory').innerHTML = `<div class="modal-loading"><p>Composing the story...</p></div>`;
 
             try {
                 const response = await fetch(STORY_ENDPOINT, {
@@ -1229,15 +1464,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ event, cutoffDate })
                 });
-
                 if (!response.ok) throw new Error('Failed to fetch story');
-
                 const data = await response.json();
-                modalStory.textContent = data.story;
-
+                document.getElementById('modalStory').textContent = data.story;
             } catch (error) {
-                console.error('Error fetching story:', error);
-                modalStory.textContent = 'Unable to retrieve the full story at this time. Please try again.';
+                document.getElementById('modalStory').textContent = 'Unable to retrieve the full story at this time.';
             }
         }
 
@@ -1255,7 +1486,7 @@
 
         function resetTimeMachine() {
             document.getElementById('mainContent').classList.remove('active');
-            document.getElementById('dateSection').style.display = 'block';
+            document.querySelector('.main-layout').style.display = 'grid';
             cutoffDate = null;
             conversationHistory = [];
             currentEvents = [];
@@ -1285,14 +1516,7 @@
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'message assistant';
             loadingDiv.id = 'loadingMessage';
-            loadingDiv.innerHTML = `
-                <div class="message-sender">Old Timey AI</div>
-                <div class="loading">
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
-                </div>
-            `;
+            loadingDiv.innerHTML = `<div class="message-sender">Old Timey AI</div><div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>`;
             chatBox.appendChild(loadingDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
@@ -1311,46 +1535,26 @@
 
             input.value = '';
             sendBtn.disabled = true;
-
             addMessage('user', userMessage);
-
-            conversationHistory.push({
-                role: 'user',
-                content: userMessage
-            });
-
+            conversationHistory.push({ role: 'user', content: userMessage });
             addLoadingIndicator();
 
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        cutoffDate: cutoffDate,
-                        messages: conversationHistory
-                    })
+                    body: JSON.stringify({ cutoffDate, messages: conversationHistory })
                 });
 
                 removeLoadingIndicator();
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Something went wrong');
-                }
+                if (!response.ok) throw new Error((await response.json()).error || 'Something went wrong');
 
                 const data = await response.json();
-                const assistantMessage = data.response;
-
-                conversationHistory.push({
-                    role: 'assistant',
-                    content: assistantMessage
-                });
-
-                addMessage('assistant', assistantMessage);
-
+                conversationHistory.push({ role: 'assistant', content: data.response });
+                addMessage('assistant', data.response);
             } catch (error) {
                 removeLoadingIndicator();
-                addMessage('assistant', `I beg your pardon, but I seem to have encountered a difficulty: ${error.message}. Perhaps try again in a moment?`);
+                addMessage('assistant', `I beg your pardon, but I seem to have encountered a difficulty: ${error.message}`);
             }
 
             sendBtn.disabled = false;
