@@ -24,9 +24,7 @@ jobs:
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
-          echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" > functions/.env
           npx firebase-tools@latest deploy --only functions --project oldtimeyai-928be --force
