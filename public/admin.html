@@ -223,7 +223,27 @@
 
 <script>
   const BASE = "https://us-central1-oldtimeyai-928be.cloudfunctions.net";
+  const HASH = "f1b328fed2db989af6b62de802db42c8be34075348d2c826400af25406e938c9";
   let allLogs = [];
+
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function checkAuth() {
+    const stored = sessionStorage.getItem("admin_auth");
+    if (stored === HASH) return true;
+    const pwd = prompt("Enter admin password:");
+    if (!pwd) { document.body.innerHTML = "<p style=\'color:#888;padding:2rem\'>Access denied.</p>"; return false; }
+    const hashed = await sha256(pwd);
+    if (hashed === HASH) {
+      sessionStorage.setItem("admin_auth", hashed);
+      return true;
+    }
+    document.body.innerHTML = "<p style=\'color:#888;padding:2rem\'>Incorrect password.</p>";
+    return false;
+  }
 
   async function loadLogs() {
     document.getElementById("loadingIndicator").textContent = "Loading...";
@@ -306,7 +326,7 @@
     return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  loadLogs();
+  (async () => { if (await checkAuth()) loadLogs(); })();
 </script>
 </body>
 </html>
