@@ -22,7 +22,11 @@ jobs:
           channelId: live
           projectId: oldtimeyai-928be
       - name: Deploy Cloud Functions
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}' > /tmp/sa_key.json
+          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
+          unset GOOGLE_APPLICATION_CREDENTIALS
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
+          echo "Using credentials for: $(cat /tmp/sa_key.json | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("client_email","unknown"))')"
           npx firebase-tools@latest deploy --only functions --project oldtimeyai-928be --force
