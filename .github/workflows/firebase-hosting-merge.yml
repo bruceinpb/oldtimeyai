@@ -22,8 +22,7 @@ jobs:
           channelId: live
           projectId: oldtimeyai-928be
       - name: Deploy Cloud Functions
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only functions --project oldtimeyai-928be
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}' > /tmp/sa_key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
+          npx firebase-tools@latest deploy --only functions --project oldtimeyai-928be --force
