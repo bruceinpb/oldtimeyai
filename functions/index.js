@@ -307,7 +307,7 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
 
 // Admin: Get Chat Logs
 exports.getLogs = onRequest(
-  { cors: true, invoker: "public" },
+  { cors: true },
   async (req, res) => {
     try {
       const limit = parseInt(req.query.limit) || 200;
@@ -352,7 +352,7 @@ exports.getLogs = onRequest(
 
 // Admin: Clear Chat Logs
 exports.clearLogs = onRequest(
-  { cors: true, invoker: "public" },
+  { cors: true },
   async (req, res) => {
     if (req.method !== "DELETE" && req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
