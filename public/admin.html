@@ -228,7 +228,7 @@
   async function loadLogs() {
     document.getElementById("loadingIndicator").textContent = "Loading...";
     try {
-      const r = await fetch(`${BASE}/getLogs?limit=200`);
+      const r = await fetch(`${BASE}/adminLogs?limit=200`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
 
@@ -294,7 +294,7 @@
   async function clearLogs() {
     if (!confirm("Delete ALL chat logs? This cannot be undone.")) return;
     try {
-      const r = await fetch(`${BASE}/clearLogs`, { method: "POST" });
+      const r = await fetch(`${BASE}/adminLogs`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({action:"clear"}) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       await loadLogs();
     } catch (e) {

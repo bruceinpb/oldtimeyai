@@ -305,10 +305,28 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
   }
 );
 
-// Admin: Get Chat Logs
-exports.getLogs = onRequest(
-  { cors: true },
+// Admin: Get Chat Logs (merged into adminLogs - uses counter's existing public invoker)
+exports.adminLogs = onRequest(
+  {
+    cors: true,
+    invoker: "public"
+  },
   async (req, res) => {
+    // DELETE or POST with action=clear -> clear logs
+    if (req.method === "DELETE" || (req.method === "POST" && req.body?.action === "clear")) {
+      try {
+        const snapshot = await db.collection("chatLogs").limit(500).get();
+        const batch = db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        return res.json({ deleted: snapshot.size });
+      } catch (error) {
+        logger.error("clearLogs error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // GET -> return logs
     try {
       const limit = parseInt(req.query.limit) || 200;
       const snapshot = await db.collection("chatLogs")
@@ -330,41 +348,18 @@ exports.getLogs = onRequest(
         });
       });
 
-      // Stats
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
       const todayCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= todayStart).length;
       const weekCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= weekStart).length;
-
-      // Top era
       const eraCounts = {};
       logs.forEach(l => { if (l.era) eraCounts[l.era] = (eraCounts[l.era] || 0) + 1; });
       const topEra = Object.entries(eraCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
       return res.json({ total: logs.length, today: todayCount, thisWeek: weekCount, topEra, logs });
     } catch (error) {
-      logger.error("getLogs error", { message: error.message });
-      return res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// Admin: Clear Chat Logs
-exports.clearLogs = onRequest(
-  { cors: true },
-  async (req, res) => {
-    if (req.method !== "DELETE" && req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-    try {
-      const snapshot = await db.collection("chatLogs").limit(500).get();
-      const batch = db.batch();
-      snapshot.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      return res.json({ deleted: snapshot.size });
-    } catch (error) {
-      logger.error("clearLogs error", { message: error.message });
+      logger.error("adminLogs error", { message: error.message });
       return res.status(500).json({ error: error.message });
     }
   }
