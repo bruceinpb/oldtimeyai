@@ -283,10 +283,93 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
       }
 
       const data = JSON.parse(responseText);
-      return res.json({ response: data.content[0].text });
+      const aiResponse = data.content[0].text;
+
+      // Save exchange to Firestore for admin logging
+      try {
+        const userMessage = messages[messages.length - 1];
+        await db.collection("chatLogs").add({
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          cutoffDate: formattedDate,
+          era: year,
+          userMessage: userMessage ? userMessage.content : "",
+          aiResponse: aiResponse,
+          messageCount: messages.length
+        });
+      } catch (logError) {
+        logger.error("Failed to save chat log", { message: logError.message });
+        // Don't fail the request if logging fails
+      }
+
+      return res.json({ response: aiResponse });
 
     } catch (error) {
       logger.error("Function error", { message: error.message, stack: error.stack });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Admin: Get Chat Logs
+exports.getLogs = onRequest(
+  { cors: true, invoker: "public" },
+  async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 200;
+      const snapshot = await db.collection("chatLogs")
+        .orderBy("timestamp", "desc")
+        .limit(limit)
+        .get();
+
+      const logs = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        logs.push({
+          id: doc.id,
+          timestamp: d.timestamp?.toDate?.()?.toISOString() || null,
+          cutoffDate: d.cutoffDate,
+          era: d.era,
+          userMessage: d.userMessage,
+          aiResponse: d.aiResponse,
+          messageCount: d.messageCount
+        });
+      });
+
+      // Stats
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      const todayCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= todayStart).length;
+      const weekCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= weekStart).length;
+
+      // Top era
+      const eraCounts = {};
+      logs.forEach(l => { if (l.era) eraCounts[l.era] = (eraCounts[l.era] || 0) + 1; });
+      const topEra = Object.entries(eraCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+
+      return res.json({ total: logs.length, today: todayCount, thisWeek: weekCount, topEra, logs });
+    } catch (error) {
+      logger.error("getLogs error", { message: error.message });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Admin: Clear Chat Logs
+exports.clearLogs = onRequest(
+  { cors: true, invoker: "public" },
+  async (req, res) => {
+    if (req.method !== "DELETE" && req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+    try {
+      const snapshot = await db.collection("chatLogs").limit(500).get();
+      const batch = db.batch();
+      snapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      return res.json({ deleted: snapshot.size });
+    } catch (error) {
+      logger.error("clearLogs error", { message: error.message });
       return res.status(500).json({ error: error.message });
     }
   }

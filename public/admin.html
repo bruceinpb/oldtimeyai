@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OldTimeyAI — Admin Log</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2433;
+      --border: #30363d;
+      --gold: #c9a84c;
+      --gold-dim: #8a6f2e;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --red: #da3633;
+      --green: #3fb950;
+      --blue: #58a6ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 .gear { animation: spin 12s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loadingIndicator {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 16px 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      min-width: 140px;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .stat-card .value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 24px 14px;
+      flex-wrap: wrap;
+    }
+    input[type="text"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 12px;
+      font-size: 13px;
+      width: 220px;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--gold-dim); }
+    input[type="text"]::placeholder { color: var(--text-dim); }
+    select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+    button {
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    .btn-refresh { background: var(--surface2); border-color: var(--border); color: var(--blue); }
+    .btn-clear   { background: #3d1a1a; border-color: var(--red); color: var(--red); }
+
+    /* Log table */
+    .table-wrap {
+      padding: 0 24px 24px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td {
+      padding: 10px 12px;
+      vertical-align: top;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .td-time { white-space: nowrap; color: var(--text-dim); font-size: 12px; }
+    .td-era  { white-space: nowrap; font-weight: 600; color: var(--gold); }
+    .td-msg  { max-width: 320px; word-break: break-word; }
+    .td-resp { max-width: 420px; word-break: break-word; color: var(--text-dim); }
+    .td-turns { text-align: center; }
+    .truncate {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .truncate.expanded {
+      display: block;
+      -webkit-line-clamp: unset;
+    }
+
+    /* Empty / error */
+    .empty {
+      text-align: center;
+      color: var(--text-dim);
+      padding: 48px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span class="gear">⚙</span> OldTimeyAI — Admin Log</h1>
+  <span id="loadingIndicator"></span>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><div class="label">Total Exchanges</div><div class="value" id="statTotal">—</div></div>
+  <div class="stat-card"><div class="label">Today</div><div class="value" id="statToday">—</div></div>
+  <div class="stat-card"><div class="label">This Week</div><div class="value" id="statWeek">—</div></div>
+  <div class="stat-card"><div class="label">Top Era Used</div><div class="value" id="statEra" style="font-size:18px">—</div></div>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="Search questions or answers..." oninput="renderTable()" />
+  <select id="sortSelect" onchange="renderTable()">
+    <option value="newest">Newest first</option>
+    <option value="oldest">Oldest first</option>
+  </select>
+  <select id="filterEra" onchange="renderTable()">
+    <option value="">All eras</option>
+  </select>
+  <button class="btn-refresh" onclick="loadLogs()">⟳ Refresh</button>
+  <button class="btn-clear" onclick="clearLogs()">✕ Clear All Logs</button>
+</div>
+
+<div class="table-wrap">
+  <table id="logTable">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Era (Year)</th>
+        <th>User Question</th>
+        <th>AI Response</th>
+        <th>Turns</th>
+      </tr>
+    </thead>
+    <tbody id="logBody">
+      <tr><td colspan="5" class="empty">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const BASE = "https://us-central1-oldtimeyai-928be.cloudfunctions.net";
+  let allLogs = [];
+
+  async function loadLogs() {
+    document.getElementById("loadingIndicator").textContent = "Loading...";
+    try {
+      const r = await fetch(`${BASE}/getLogs?limit=200`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+
+      document.getElementById("statTotal").textContent = data.total ?? "—";
+      document.getElementById("statToday").textContent = data.today ?? "—";
+      document.getElementById("statWeek").textContent = data.thisWeek ?? "—";
+      document.getElementById("statEra").textContent = data.topEra ?? "—";
+
+      allLogs = data.logs || [];
+      populateEraFilter();
+      renderTable();
+      document.getElementById("loadingIndicator").textContent = "";
+    } catch (e) {
+      document.getElementById("loadingIndicator").textContent = "";
+      document.getElementById("logBody").innerHTML =
+        `<tr><td colspan="5" class="empty">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function populateEraFilter() {
+    const eras = [...new Set(allLogs.map(l => l.era).filter(Boolean))].sort();
+    const sel = document.getElementById("filterEra");
+    sel.innerHTML = '<option value="">All eras</option>';
+    eras.forEach(e => { const o = document.createElement("option"); o.value = e; o.textContent = e; sel.appendChild(o); });
+  }
+
+  function renderTable() {
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const sort = document.getElementById("sortSelect").value;
+    const era = document.getElementById("filterEra").value;
+
+    let logs = allLogs.filter(l => {
+      if (era && String(l.era) !== String(era)) return false;
+      if (search) {
+        const haystack = `${l.userMessage} ${l.aiResponse} ${l.cutoffDate}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      return true;
+    });
+
+    if (sort === "oldest") logs = [...logs].reverse();
+
+    if (logs.length === 0) {
+      document.getElementById("logBody").innerHTML =
+        `<tr><td colspan="5" class="empty">No conversations found.</td></tr>`;
+      return;
+    }
+
+    const rows = logs.map(l => {
+      const ts = l.timestamp ? new Date(l.timestamp).toLocaleString() : "—";
+      return `<tr>
+        <td class="td-time">${ts}</td>
+        <td class="td-era">${l.era || "?"}</td>
+        <td class="td-msg"><div class="truncate" onclick="this.classList.toggle('expanded')">${escHtml(l.userMessage || "")}</div></td>
+        <td class="td-resp"><div class="truncate" onclick="this.classList.toggle('expanded')">${escHtml(l.aiResponse || "")}</div></td>
+        <td class="td-turns">${l.messageCount || "—"}</td>
+      </tr>`;
+    }).join("");
+
+    document.getElementById("logBody").innerHTML = rows;
+  }
+
+  async function clearLogs() {
+    if (!confirm("Delete ALL chat logs? This cannot be undone.")) return;
+    try {
+      const r = await fetch(`${BASE}/clearLogs`, { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await loadLogs();
+    } catch (e) {
+      alert("Clear failed: " + e.message);
+    }
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  loadLogs();
+</script>
+</body>
+</html>
