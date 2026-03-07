@@ -9,24 +9,72 @@ const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
-// Visitor Counter endpoint
+// Visitor Counter + Admin Logs endpoint
 exports.counter = onRequest(
   { 
     cors: true,
     invoker: "public"
   },
   async (req, res) => {
+    // Admin logs: GET /counter?action=logs
+    if (req.method === "GET" && req.query.action === "logs") {
+      try {
+        const limit = parseInt(req.query.limit) || 200;
+        const snapshot = await db.collection("chatLogs")
+          .orderBy("timestamp", "desc")
+          .limit(limit)
+          .get();
+        const logs = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          logs.push({
+            id: doc.id,
+            timestamp: d.timestamp?.toDate?.()?.toISOString() || null,
+            cutoffDate: d.cutoffDate,
+            era: d.era,
+            userMessage: d.userMessage,
+            aiResponse: d.aiResponse,
+            messageCount: d.messageCount
+          });
+        });
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        const todayCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= todayStart).length;
+        const weekCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= weekStart).length;
+        const eraCounts = {};
+        logs.forEach(l => { if (l.era) eraCounts[l.era] = (eraCounts[l.era] || 0) + 1; });
+        const topEra = Object.entries(eraCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+        return res.json({ total: logs.length, today: todayCount, thisWeek: weekCount, topEra, logs });
+      } catch (error) {
+        logger.error("getLogs error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // Admin logs: POST /counter?action=clearLogs
+    if (req.method === "POST" && req.query.action === "clearLogs") {
+      try {
+        const snapshot = await db.collection("chatLogs").limit(500).get();
+        const batch = db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        return res.json({ deleted: snapshot.size });
+      } catch (error) {
+        logger.error("clearLogs error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // Default: visitor counter
     try {
       const counterRef = db.collection("stats").doc("visitors");
       
       if (req.method === "POST") {
         const { setCount } = req.body || {};
-        
         if (setCount !== undefined) {
-          // Set to specific value
           await counterRef.set({ count: parseInt(setCount) });
         } else {
-          // Increment the counter
           await counterRef.set(
             { count: admin.firestore.FieldValue.increment(1) },
             { merge: true }
@@ -34,10 +82,8 @@ exports.counter = onRequest(
         }
       }
       
-      // Get current count
       const doc = await counterRef.get();
       const count = doc.exists ? doc.data().count : 0;
-      
       return res.json({ count });
     } catch (error) {
       logger.error("Counter error", { message: error.message });
@@ -310,62 +356,3 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
   }
 );
 
-// Admin: Get Chat Logs (merged into adminLogs - uses counter's existing public invoker)
-exports.adminLogs = onRequest(
-  {
-    cors: true,
-    invoker: "public"
-  },
-  async (req, res) => {
-    // DELETE or POST with action=clear -> clear logs
-    if (req.method === "DELETE" || (req.method === "POST" && req.body?.action === "clear")) {
-      try {
-        const snapshot = await db.collection("chatLogs").limit(500).get();
-        const batch = db.batch();
-        snapshot.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-        return res.json({ deleted: snapshot.size });
-      } catch (error) {
-        logger.error("clearLogs error", { message: error.message });
-        return res.status(500).json({ error: error.message });
-      }
-    }
-
-    // GET -> return logs
-    try {
-      const limit = parseInt(req.query.limit) || 200;
-      const snapshot = await db.collection("chatLogs")
-        .orderBy("timestamp", "desc")
-        .limit(limit)
-        .get();
-
-      const logs = [];
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        logs.push({
-          id: doc.id,
-          timestamp: d.timestamp?.toDate?.()?.toISOString() || null,
-          cutoffDate: d.cutoffDate,
-          era: d.era,
-          userMessage: d.userMessage,
-          aiResponse: d.aiResponse,
-          messageCount: d.messageCount
-        });
-      });
-
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-      const todayCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= todayStart).length;
-      const weekCount = logs.filter(l => l.timestamp && new Date(l.timestamp) >= weekStart).length;
-      const eraCounts = {};
-      logs.forEach(l => { if (l.era) eraCounts[l.era] = (eraCounts[l.era] || 0) + 1; });
-      const topEra = Object.entries(eraCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-
-      return res.json({ total: logs.length, today: todayCount, thisWeek: weekCount, topEra, logs });
-    } catch (error) {
-      logger.error("adminLogs error", { message: error.message });
-      return res.status(500).json({ error: error.message });
-    }
-  }
-);
