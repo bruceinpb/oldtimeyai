@@ -1,5 +1,4 @@
 const { onRequest } = require("firebase-functions/https");
-const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 
@@ -7,7 +6,6 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 const db = admin.firestore();
 
-const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
 // Visitor Counter endpoint
 exports.counter = onRequest(
@@ -50,7 +48,6 @@ exports.counter = onRequest(
 exports.events = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey],
     invoker: "public"
   },
   async (req, res) => {
@@ -101,7 +98,7 @@ Focus on genuinely significant events - wars, treaties, scientific discoveries, 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": anthropicApiKey.value(),
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
@@ -145,7 +142,6 @@ Focus on genuinely significant events - wars, treaties, scientific discoveries, 
 exports.story = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey],
     invoker: "public"
   },
   async (req, res) => {
@@ -186,7 +182,7 @@ End with a thought-provoking reflection on the significance of this moment in hi
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": anthropicApiKey.value(),
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
@@ -220,7 +216,6 @@ End with a thought-provoking reflection on the significance of this moment in hi
 exports.chat = onRequest(
   { 
     cors: true,
-    secrets: [anthropicApiKey],
     invoker: "public"
   },
   async (req, res) => {
@@ -260,7 +255,7 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": anthropicApiKey.value(),
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
