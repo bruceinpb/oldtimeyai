@@ -1408,6 +1408,19 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             { year: 1430, question: "A peasant girl claims angels told her to save France. Is she a saint or a witch?", answer: "Joan of Arc is either divinely inspired or demonically possessed—there is no middle ground!\n\nHer military successes suggest God's favor, but a woman leading armies violates natural order.\n\nThe English say she is a witch; the French say she is a saint. Both cannot be right.\n\nBe cautious in your judgment. If she succeeds, she may be canonized. If she fails, she will surely burn." }
         ];
 
+        // Fisher-Yates shuffle for random order
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Shuffle the historical Q&A array once at load
+        const shuffledHistoricalQA = shuffleArray(historicalQA);
+
         // Initialize visitor counter
         async function initVisitorCounter() {
             try {
@@ -1429,7 +1442,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
 
         // Q&A rotation
         function rotateQA() {
-            const qa = historicalQA[qaIndex];
+            const qa = shuffledHistoricalQA[qaIndex];
             
             document.getElementById('questionYear').textContent = qa.year;
             document.getElementById('answerYear').textContent = qa.year;
@@ -1453,7 +1466,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             answerText.style.animation = 'scrollUpAnswer 4s ease-out forwards';
             progressBar.style.animation = 'progress 30s linear';
             
-            qaIndex = (qaIndex + 1) % historicalQA.length;
+            qaIndex = (qaIndex + 1) % shuffledHistoricalQA.length;
         }
 
         // Initialize Q&A rotation
