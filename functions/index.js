@@ -608,6 +608,78 @@ HTML:
       }
     }
 
+
+    // ── Debug: GET /counter?action=debugHeartbeat ────────────────────────────
+    // Runs all heartbeat steps except Claude call — returns step-by-step trace
+    if (req.method === "GET" && req.query.action === "debugHeartbeat") {
+      const trace = [];
+      try {
+        const settingsDoc = await db.collection("config").doc("settings").get();
+        const threshold         = settingsDoc.exists ? (settingsDoc.data().threshold         || 5) : 5;
+        const heartbeatInterval = settingsDoc.exists ? (settingsDoc.data().heartbeatInterval || 5) : 5;
+        const lastHeartbeatAt   = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt    : null;
+        trace.push({ step: 1, threshold, heartbeatInterval, lastHeartbeatAt: lastHeartbeatAt?.toDate?.()?.toISOString() || null });
+
+        let elapsedMin = null;
+        if (lastHeartbeatAt) {
+          elapsedMin = (Date.now() - lastHeartbeatAt.toDate().getTime()) / 60000;
+          if (elapsedMin < heartbeatInterval) {
+            trace.push({ step: 'EXIT', reason: 'interval not elapsed', elapsedMin });
+            return res.json({ trace });
+          }
+        }
+        trace.push({ step: '1-PASS', elapsedMin });
+
+        const [betaDoc, queueDoc] = await Promise.all([
+          db.collection("config").doc("betaVersion").get(),
+          db.collection("config").doc("analysisQueue").get()
+        ]);
+        const betaStatus = betaDoc.exists ? betaDoc.data().status : null;
+        trace.push({ step: 2, betaExists: betaDoc.exists, betaStatus, queueExists: queueDoc.exists });
+        if (betaDoc.exists && (betaStatus === "pending_review" || betaStatus === "published")) {
+          trace.push({ step: 'EXIT', reason: 'beta exists', betaStatus });
+          return res.json({ trace });
+        }
+        trace.push({ step: '2-PASS' });
+
+        const allPendingSnap = await db.collection("feedbackReports")
+          .where("status", "==", "pending")
+          .get();
+        const bugs = [], features = [];
+        allPendingSnap.forEach(doc => {
+          if (doc.data().type === "bug") bugs.push(doc.data().text?.substring(0,50));
+          else features.push(doc.data().text?.substring(0,50));
+        });
+        trace.push({ step: 3, bugs: bugs.length, features: features.length, threshold });
+
+        let triggerType = null;
+        if (bugs.length >= threshold)     triggerType = "bug";
+        else if (features.length >= threshold) triggerType = "feature";
+        trace.push({ step: '3-result', triggerType, wouldTrigger: !!triggerType });
+
+        if (!triggerType) {
+          trace.push({ step: 'EXIT', reason: 'threshold not reached' });
+          return res.json({ trace });
+        }
+        trace.push({ step: '3-PASS', triggerType });
+
+        // Step 4: fetch index.html
+        const siteRes = await fetch("https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html");
+        trace.push({ step: 4, indexHtmlStatus: siteRes.status, ok: siteRes.ok });
+        if (!siteRes.ok) {
+          trace.push({ step: 'EXIT', reason: 'index.html fetch failed' });
+          return res.json({ trace });
+        }
+        const html = await siteRes.text();
+        trace.push({ step: '4-PASS', htmlLength: html.length });
+        trace.push({ step: 'WOULD_CALL_CLAUDE', triggerType, reportsCount: triggerType === "bug" ? bugs.length : features.length });
+        return res.json({ trace, status: "All steps pass — Claude would be called next" });
+      } catch (err) {
+        trace.push({ step: 'ERROR', message: err.message });
+        return res.json({ trace, error: err.message });
+      }
+    }
+
     // ── Default: visitor counter ─────────────────────────────────────────────
     try {
       const counterRef = db.collection("stats").doc("visitors");
