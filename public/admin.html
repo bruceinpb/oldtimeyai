@@ -236,6 +236,82 @@
       color: var(--text);
       cursor: pointer;
     }
+
+    /* Threshold card */
+    .threshold-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .threshold-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+    }
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .threshold-input {
+      width: 64px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 5px 8px;
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+    }
+    .threshold-input:focus { border-color: var(--gold-dim); }
+    .btn-save-threshold {
+      padding: 5px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--gold-dim);
+      border-radius: 4px;
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-save-threshold:hover { opacity: .85; }
+    .threshold-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Stat card threshold alert states */
+    .stat-card.threshold-warn {
+      border-color: #e09000;
+      box-shadow: 0 0 10px rgba(224,144,0,0.25);
+    }
+    .stat-card.threshold-met {
+      border-color: var(--red);
+      box-shadow: 0 0 12px rgba(218,54,51,0.35);
+      animation: alertPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 12px rgba(218,54,51,0.35); }
+      50%       { box-shadow: 0 0 22px rgba(218,54,51,0.65); }
+    }
+    .threshold-alert-label {
+      display: none;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      margin-top: 4px;
+      color: var(--red);
+    }
+    .stat-card.threshold-met .threshold-alert-label { display: block; }
   </style>
 </head>
 <body>
@@ -297,10 +373,18 @@
 <div class="tab-panel" id="panelFeedback">
 
 <div class="fb-stats">
-  <div class="stat-card"><div class="label">Total Reports</div><div class="value" id="fbTotal">—</div></div>
-  <div class="stat-card"><div class="label">Bugs</div><div class="value" id="fbBugs" style="color:#f07070">—</div></div>
-  <div class="stat-card"><div class="label">Features</div><div class="value" id="fbFeatures" style="color:#80b8ff">—</div></div>
-  <div class="stat-card"><div class="label">Pending</div><div class="value" id="fbPending" style="color:#e09000">—</div></div>
+  <div class="stat-card" id="cardTotal"><div class="label">Total Reports</div><div class="value" id="fbTotal">—</div></div>
+  <div class="stat-card" id="cardBugs"><div class="label">Bugs</div><div class="value" id="fbBugs" style="color:#f07070">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
+  <div class="stat-card" id="cardFeatures"><div class="label">Features</div><div class="value" id="fbFeatures" style="color:#80b8ff">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
+  <div class="stat-card" id="cardPending"><div class="label">Pending</div><div class="value" id="fbPending" style="color:#e09000">—</div></div>
+  <div class="threshold-card">
+    <div class="label">⚙ AutoPilot Threshold</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="thresholdInput" min="1" max="999" value="5" />
+      <button class="btn-save-threshold" onclick="saveThreshold()">Save</button>
+    </div>
+    <div class="threshold-hint">Reports needed before AutoPilot triggers</div>
+  </div>
 </div>
 
 <div class="toolbar" style="margin-top:14px">
@@ -344,6 +428,45 @@
   const HASH = "f1b328fed2db989af6b62de802db42c8be34075348d2c826400af25406e938c9";
   let allLogs = [];
   let allFeedback = [];
+
+  // ── Threshold ─────────────────────────────────────────────────────────────
+  const THRESHOLD_KEY = "autopilot_threshold";
+
+  function loadThreshold() {
+    const saved = localStorage.getItem(THRESHOLD_KEY);
+    const val = saved ? parseInt(saved) : 5;
+    document.getElementById("thresholdInput").value = val;
+    return val;
+  }
+
+  function saveThreshold() {
+    const val = parseInt(document.getElementById("thresholdInput").value);
+    if (isNaN(val) || val < 1) { alert("Please enter a number of 1 or more."); return; }
+    localStorage.setItem(THRESHOLD_KEY, val);
+    // Re-check current counts immediately
+    const bugs     = parseInt(document.getElementById("fbBugs").textContent)     || 0;
+    const features = parseInt(document.getElementById("fbFeatures").textContent) || 0;
+    checkThreshold(bugs, features, val);
+    // Brief flash to confirm save
+    const btn = document.querySelector(".btn-save-threshold");
+    btn.textContent = "✓ Saved";
+    setTimeout(() => btn.textContent = "Save", 1500);
+  }
+
+  function checkThreshold(bugs, features, threshold) {
+    const cardBugs     = document.getElementById("cardBugs");
+    const cardFeatures = document.getElementById("cardFeatures");
+
+    // Bugs card
+    cardBugs.classList.remove("threshold-warn", "threshold-met");
+    if (bugs >= threshold)        cardBugs.classList.add("threshold-met");
+    else if (bugs >= threshold * 0.6) cardBugs.classList.add("threshold-warn");
+
+    // Features card
+    cardFeatures.classList.remove("threshold-warn", "threshold-met");
+    if (features >= threshold)        cardFeatures.classList.add("threshold-met");
+    else if (features >= threshold * 0.6) cardFeatures.classList.add("threshold-warn");
+  }
 
   async function sha256(str) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
@@ -464,6 +587,10 @@
       document.getElementById("fbFeatures").textContent = data.featureCount ?? "—";
       document.getElementById("fbPending").textContent  = data.pendingCount ?? "—";
 
+      // Check threshold alert state
+      const threshold = parseInt(localStorage.getItem(THRESHOLD_KEY)) || 5;
+      checkThreshold(data.bugCount || 0, data.featureCount || 0, threshold);
+
       // Update pending badge on tab
       const pb = document.getElementById("pendingBadge");
       if (data.pendingCount > 0) {
@@ -546,7 +673,7 @@
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  (async () => { if (await checkAuth()) loadLogs(); })();
+  (async () => { loadThreshold(); if (await checkAuth()) loadLogs(); })();
 </script>
 </body>
 </html>
