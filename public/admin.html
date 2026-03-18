@@ -499,6 +499,15 @@
     </div>
     <div class="threshold-hint">Reports needed before AutoPilot triggers</div>
   </div>
+  <div class="threshold-card">
+    <div class="label">⏱ Heartbeat Interval</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="heartbeatInput" min="5" max="1440" value="5" style="width:72px" />
+      <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">min</span>
+      <button class="btn-save-threshold" onclick="saveHeartbeat()">Save</button>
+    </div>
+    <div class="threshold-hint" id="heartbeatHint">Last run: checking...</div>
+  </div>
 </div>
 
 <div class="toolbar" style="margin-top:14px">
@@ -578,17 +587,55 @@
     const saved = localStorage.getItem(THRESHOLD_KEY);
     const val = saved ? parseInt(saved) : 5;
     document.getElementById("thresholdInput").value = val;
-    // Also pull from Firestore to stay in sync with server-side auto-trigger
+    // Pull both threshold and heartbeat interval from Firestore
     fetch(`${BASE}/counter?action=getSettings`)
       .then(r => r.json())
       .then(data => {
-        if (data.threshold && data.threshold !== val) {
+        if (data.threshold) {
           document.getElementById("thresholdInput").value = data.threshold;
           localStorage.setItem(THRESHOLD_KEY, data.threshold);
         }
+        if (data.heartbeatInterval) {
+          document.getElementById("heartbeatInput").value = data.heartbeatInterval;
+          localStorage.setItem("autopilot_heartbeat_interval", data.heartbeatInterval);
+        }
+        // Show last heartbeat time
+        const hint = document.getElementById("heartbeatHint");
+        if (data.lastHeartbeatAt) {
+          const ago = Math.round((Date.now() - new Date(data.lastHeartbeatAt)) / 60000);
+          hint.textContent = ago < 1 ? "Last run: just now" : `Last run: ${ago}m ago`;
+        } else {
+          hint.textContent = "Last run: never (pending deploy)";
+        }
       })
-      .catch(() => {}); // silent fail — localStorage value is the fallback
+      .catch(() => {
+        document.getElementById("heartbeatHint").textContent = "Last run: unavailable";
+      });
+    // Also set heartbeat from localStorage while Firestore loads
+    const savedInterval = localStorage.getItem("autopilot_heartbeat_interval");
+    if (savedInterval) document.getElementById("heartbeatInput").value = savedInterval;
     return val;
+  }
+
+  function saveHeartbeat() {
+    const val = parseInt(document.getElementById("heartbeatInput").value);
+    if (isNaN(val) || val < 5 || val > 1440) {
+      alert("Heartbeat interval must be between 5 and 1440 minutes.");
+      return;
+    }
+    localStorage.setItem("autopilot_heartbeat_interval", val);
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heartbeatInterval: val })
+    })
+    .then(r => r.json())
+    .then(() => {
+      const btn = document.querySelectorAll(".btn-save-threshold")[1];
+      btn.textContent = "✓ Saved";
+      setTimeout(() => btn.textContent = "Save", 1500);
+    })
+    .catch(e => alert("Save failed: " + e.message));
   }
 
   function saveThreshold() {
@@ -839,12 +886,21 @@
   // Called on load and after any beta action — syncs UI to Firestore state
   async function syncBetaState() {
     try {
-      const [betaRes, queueRes] = await Promise.all([
+      const [betaRes, queueRes, settingsRes] = await Promise.all([
         fetch(`${BASE}/counter?action=getBeta`),
-        fetch(`${BASE}/counter?action=getQueue`)
+        fetch(`${BASE}/counter?action=getQueue`),
+        fetch(`${BASE}/counter?action=getSettings`)
       ]);
-      const data  = betaRes.ok  ? await betaRes.json()  : { exists: false };
-      const queue = queueRes.ok ? await queueRes.json() : { queued: false };
+      const data     = betaRes.ok     ? await betaRes.json()     : { exists: false };
+      const queue    = queueRes.ok    ? await queueRes.json()    : { queued: false };
+      const settings = settingsRes.ok ? await settingsRes.json() : {};
+
+      // Refresh last heartbeat hint
+      if (settings.lastHeartbeatAt) {
+        const ago = Math.round((Date.now() - new Date(settings.lastHeartbeatAt)) / 60000);
+        document.getElementById("heartbeatHint").textContent =
+          ago < 1 ? "Last run: just now" : `Last run: ${ago}m ago`;
+      }
 
       _betaIsLive = data.exists && (data.status === "published" || data.status === "promoted");
       const isPendingReview = data.exists && data.status === "pending_review";

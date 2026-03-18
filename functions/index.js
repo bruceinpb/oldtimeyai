@@ -395,8 +395,10 @@ HTML:
     if (req.method === "GET" && req.query.action === "getSettings") {
       try {
         const doc = await db.collection("config").doc("settings").get();
-        const threshold = doc.exists ? (doc.data().threshold || 5) : 5;
-        return res.json({ threshold });
+        const threshold          = doc.exists ? (doc.data().threshold          || 5)  : 5;
+        const heartbeatInterval  = doc.exists ? (doc.data().heartbeatInterval  || 5)  : 5;
+        const lastHeartbeatAt    = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
+        return res.json({ threshold, heartbeatInterval, lastHeartbeatAt });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -405,11 +407,22 @@ HTML:
     // ── Settings: POST /counter?action=saveSettings ───────────────────────────
     if (req.method === "POST" && req.query.action === "saveSettings") {
       try {
-        const { threshold } = req.body || {};
-        const val = parseInt(threshold);
-        if (isNaN(val) || val < 1) return res.status(400).json({ error: "Invalid threshold." });
-        await db.collection("config").doc("settings").set({ threshold: val }, { merge: true });
-        return res.json({ ok: true, threshold: val });
+        const { threshold, heartbeatInterval } = req.body || {};
+        const updates = {};
+        if (threshold !== undefined) {
+          const val = parseInt(threshold);
+          if (isNaN(val) || val < 1) return res.status(400).json({ error: "Invalid threshold." });
+          updates.threshold = val;
+        }
+        if (heartbeatInterval !== undefined) {
+          const val = parseInt(heartbeatInterval);
+          // Allow 5–1440 minutes (1 min minimum tick is every 5min so floor to 5)
+          if (isNaN(val) || val < 5 || val > 1440) return res.status(400).json({ error: "Heartbeat interval must be 5–1440 minutes." });
+          updates.heartbeatInterval = val;
+        }
+        if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to save." });
+        await db.collection("config").doc("settings").set(updates, { merge: true });
+        return res.json({ ok: true, ...updates });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -742,7 +755,32 @@ exports.autopilotHeartbeat = onSchedule(
     logger.info("AutoPilot heartbeat firing");
 
     try {
-      // ── 1. Check if beta or queue already exists — skip if so ──────────────
+      // ── 1. Read settings and enforce configurable interval ─────────────────
+      const settingsDoc = await db.collection("config").doc("settings").get();
+      const threshold         = settingsDoc.exists ? (settingsDoc.data().threshold         || 5) : 5;
+      const heartbeatInterval = settingsDoc.exists ? (settingsDoc.data().heartbeatInterval || 5) : 5; // minutes
+      const lastHeartbeatAt   = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt    : null;
+
+      // Skip if last run was more recent than the configured interval
+      if (lastHeartbeatAt) {
+        const elapsedMs  = Date.now() - lastHeartbeatAt.toDate().getTime();
+        const intervalMs = heartbeatInterval * 60 * 1000;
+        if (elapsedMs < intervalMs) {
+          logger.info("Heartbeat: skipping — interval not elapsed", {
+            heartbeatInterval,
+            elapsedMinutes: Math.round(elapsedMs / 60000)
+          });
+          return;
+        }
+      }
+
+      // Record this run immediately so concurrent invocations skip
+      await db.collection("config").doc("settings").set(
+        { lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+
+      // ── 2. Check if beta or queue already exists — skip if so ──────────────
       const [betaDoc, queueDoc] = await Promise.all([
         db.collection("config").doc("betaVersion").get(),
         db.collection("config").doc("analysisQueue").get()
@@ -760,10 +798,6 @@ exports.autopilotHeartbeat = onSchedule(
         // Clear stale queue so we own this run
         await db.collection("config").doc("analysisQueue").delete();
       }
-
-      // ── 2. Get threshold ───────────────────────────────────────────────────
-      const settingsDoc = await db.collection("config").doc("settings").get();
-      const threshold = settingsDoc.exists ? (settingsDoc.data().threshold || 5) : 5;
 
       // ── 3. Count pending reports by type ──────────────────────────────────
       const allPendingSnap = await db.collection("feedbackReports")
