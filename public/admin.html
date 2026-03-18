@@ -916,6 +916,8 @@
   // ── AutoPilot: beta state ─────────────────────────────────────────────────
   let _pendingHtml     = null;   // generated HTML waiting to be published
   let _pendingDiagnosis = null;  // diagnosis text for display
+  let _pendingReports  = null;   // reports analyzed — marked reviewed on publish
+  let _pendingType     = null;   // type of reports analyzed (bug/feature)
   let _betaIsLive      = false;  // true when a published beta exists in Firestore
 
   // Called on load and after any beta action — syncs UI to Firestore state
@@ -1014,6 +1016,14 @@
     document.getElementById("diagnosisWrap").style.display = "none";
     document.getElementById("btnPublish").style.display = "none";
     _pendingHtml = null;
+    _pendingReports = null;
+
+    // Reset heartbeat timer immediately so the scheduler won't race while we work
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resetHeartbeat: true })
+    }).catch(() => {});
 
     try {
       // Collect pending reports of the triggering type
@@ -1041,6 +1051,8 @@
       const data = await r.json();
       _pendingDiagnosis = data.diagnosis;
       _pendingHtml      = data.html;
+      _pendingReports   = reports;        // store for publishBeta to mark reviewed
+      _pendingType      = analyzeType;    // store type for publishBeta
 
       // Show diagnosis and enable publish
       document.getElementById("diagnosisBox").textContent = _pendingDiagnosis;
@@ -1068,11 +1080,14 @@
     btn.innerHTML = `<span class="spinner"></span> Publishing...`;
 
     try {
-      const threshold  = parseInt(localStorage.getItem(THRESHOLD_KEY)) || 5;
-      const bugs       = parseInt(document.getElementById("fbBugs").textContent) || 0;
-      const features   = parseInt(document.getElementById("fbFeatures").textContent) || 0;
-      const analyzeType = bugs >= threshold ? "bug" : "feature";
-      const reports    = allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
+      // Use the reports that were analyzed (stored in runAnalysis)
+      // Fall back to re-deriving from allFeedback if not set (e.g. syncBetaState path)
+      const analyzeType = _pendingType || (
+        parseInt(document.getElementById("fbBugs").textContent) >= (parseInt(localStorage.getItem(THRESHOLD_KEY)) || 5)
+          ? "bug" : "feature"
+      );
+      const reports = _pendingReports
+        || allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
 
       const r = await fetch(`${BASE}/counter?action=publishBeta`, {
         method: "POST",
@@ -1086,7 +1101,7 @@
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
 
-      // Mark all addressed reports as "reviewed"
+      // Mark all addressed reports as "reviewed" — resets Pending Bug/Feature counters to 0
       const updatePromises = reports.map(rep =>
         fetch(`${BASE}/counter?action=updateFeedbackStatus`, {
           method: "POST",
@@ -1095,6 +1110,10 @@
         })
       );
       await Promise.allSettled(updatePromises);
+
+      // Clear pending state
+      _pendingReports  = null;
+      _pendingType     = null;
 
       await syncBetaState();
       await loadFeedback();

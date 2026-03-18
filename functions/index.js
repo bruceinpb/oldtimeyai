@@ -458,7 +458,7 @@ exports.counter = onRequest(
     // ── Settings: POST /counter?action=saveSettings ───────────────────────────
     if (req.method === "POST" && req.query.action === "saveSettings") {
       try {
-        const { threshold, heartbeatInterval, rateLimit } = req.body || {};
+        const { threshold, heartbeatInterval, rateLimit, resetHeartbeat } = req.body || {};
         const updates = {};
         if (threshold !== undefined) {
           const val = parseInt(threshold);
@@ -475,6 +475,10 @@ exports.counter = onRequest(
           const val = parseInt(rateLimit);
           if (isNaN(val) || val < 1 || val > 60) return res.status(400).json({ error: "Rate limit must be 1–60 reports per hour." });
           updates.rateLimit = val;
+        }
+        if (resetHeartbeat === true) {
+          // Reset the timer so the scheduler won't fire again until the next full interval
+          updates.lastHeartbeatAt = admin.firestore.FieldValue.serverTimestamp();
         }
         if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to save." });
         await db.collection("config").doc("settings").set(updates, { merge: true });
@@ -625,14 +629,6 @@ exports.counter = onRequest(
           triggeredBy: "heartbeat"
         });
         await db.collection("config").doc("analysisQueue").delete().catch(() => {});
-
-        // Mark all addressed reports as "reviewed" so counters reset to zero
-        const batch = db.batch();
-        triggerReports.forEach(r => {
-          batch.update(db.collection("feedbackReports").doc(r.id), { status: "reviewed" });
-        });
-        await batch.commit();
-        logger.info("Heartbeat: reports marked reviewed", { count: triggerReports.length });
 
         logger.info("Heartbeat: SUCCESS — beta published automatically", {
           type: triggerType, reportCount: triggerReports.length, htmlLength: html.length
