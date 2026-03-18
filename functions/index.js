@@ -256,8 +256,10 @@ exports.counter = onRequest(
         });
 
         // Summary counts
-        const bugCount     = reports.filter(r => r.type === "bug").length;
-        const featureCount = reports.filter(r => r.type === "feature").length;
+        // Only count PENDING reports for threshold display and triggering.
+        // Reviewed/implemented/dismissed reports should not count toward the threshold.
+        const bugCount     = reports.filter(r => r.type === "bug"     && r.status === "pending").length;
+        const featureCount = reports.filter(r => r.type === "feature" && r.status === "pending").length;
         const pendingCount = reports.filter(r => r.status === "pending").length;
 
         return res.json({ total: reports.length, bugCount, featureCount, pendingCount, reports });
