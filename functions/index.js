@@ -165,6 +165,93 @@ exports.counter = onRequest(
       }
     }
 
+    // ── Beta: GET /counter?action=getBeta ────────────────────────────────────
+    // Returns current beta version doc (html + metadata) or null
+    if (req.method === "GET" && req.query.action === "getBeta") {
+      try {
+        const doc = await db.collection("config").doc("betaVersion").get();
+        if (!doc.exists) return res.json({ exists: false });
+        const d = doc.data();
+        return res.json({
+          exists: true,
+          html: d.html,
+          diagnosis: d.diagnosis,
+          type: d.type,
+          reportCount: d.reportCount,
+          createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
+          promotedAt: d.promotedAt?.toDate?.()?.toISOString() || null,
+          status: d.status   // "pending_review" | "published" | "promoted" | "reverted"
+        });
+      } catch (error) {
+        logger.error("getBeta error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Beta: POST /counter?action=publishBeta ────────────────────────────────
+    // Saves generated HTML + metadata as the beta version, status = "published"
+    if (req.method === "POST" && req.query.action === "publishBeta") {
+      try {
+        const { html, diagnosis, type, reportCount } = req.body || {};
+        if (!html || typeof html !== "string" || html.length < 100) {
+          return res.status(400).json({ error: "Missing or invalid html." });
+        }
+        await db.collection("config").doc("betaVersion").set({
+          html,
+          diagnosis: diagnosis || "",
+          type: type || "mixed",
+          reportCount: reportCount || 0,
+          status: "published",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          promotedAt: null
+        });
+        logger.info("Beta version published", { type, reportCount });
+        return res.json({ ok: true });
+      } catch (error) {
+        logger.error("publishBeta error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Beta: POST /counter?action=promoteBeta ───────────────────────────────
+    // Promotes beta to stable: copies beta html into config/stableVersion
+    if (req.method === "POST" && req.query.action === "promoteBeta") {
+      try {
+        const betaDoc = await db.collection("config").doc("betaVersion").get();
+        if (!betaDoc.exists) return res.status(404).json({ error: "No beta version exists." });
+        const betaData = betaDoc.data();
+        // Save current beta as new stable
+        await db.collection("config").doc("stableVersion").set({
+          html: betaData.html,
+          promotedFrom: "beta",
+          promotedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        // Mark beta as promoted
+        await db.collection("config").doc("betaVersion").update({
+          status: "promoted",
+          promotedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        logger.info("Beta promoted to stable");
+        return res.json({ ok: true });
+      } catch (error) {
+        logger.error("promoteBeta error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Beta: POST /counter?action=clearBeta ─────────────────────────────────
+    // Removes beta version — beta button goes grey again on site
+    if (req.method === "POST" && req.query.action === "clearBeta") {
+      try {
+        await db.collection("config").doc("betaVersion").delete();
+        logger.info("Beta version cleared");
+        return res.json({ ok: true });
+      } catch (error) {
+        logger.error("clearBeta error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
     // ── Default: visitor counter ─────────────────────────────────────────────
     try {
       const counterRef = db.collection("stats").doc("visitors");

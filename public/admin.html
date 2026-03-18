@@ -312,6 +312,120 @@
       color: var(--red);
     }
     .stat-card.threshold-met .threshold-alert-label { display: block; }
+
+    /* ── AutoPilot panel ──────────────────────────────────────────── */
+    .autopilot-panel {
+      margin: 16px 24px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .autopilot-header {
+      background: var(--surface);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .autopilot-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .autopilot-body {
+      padding: 20px;
+      background: var(--surface2);
+    }
+    .autopilot-status {
+      font-size: 13px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Analyze button */
+    .btn-analyze {
+      background: #1a2a0a;
+      border: 1px solid #3fb950;
+      border-radius: 6px;
+      color: #3fb950;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-analyze:hover { opacity: .85; }
+    .btn-analyze:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* Beta control buttons */
+    .btn-publish  { background: #0d2a3d; border: 1px solid var(--blue);  color: var(--blue);  padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn-promote  { background: #0d2d17; border: 1px solid var(--green); color: var(--green); padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn-revert   { background: #3d1a1a; border: 1px solid var(--red);   color: var(--red);   padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn-publish:hover, .btn-promote:hover, .btn-revert:hover { opacity: .85; }
+    .btn-publish:disabled, .btn-promote:disabled, .btn-revert:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* Diagnosis box */
+    .diagnosis-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-top: 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .diagnosis-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    /* Beta live badge */
+    .beta-live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #0d2a3d;
+      border: 1px solid var(--blue);
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: .05em;
+    }
+    .beta-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: livePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
   </style>
 </head>
 <body>
@@ -404,7 +518,35 @@
   <button class="btn-refresh" onclick="loadFeedback()">⟳ Refresh</button>
 </div>
 
-<div class="table-wrap">
+<!-- ── AutoPilot Panel ───────────────────────────────────────────── -->
+<div class="autopilot-panel" id="autopilotPanel">
+  <div class="autopilot-header">
+    <div class="autopilot-title">
+      <span>🤖</span>
+      <span>AutoPilot — AI Code Generator</span>
+      <span id="betaLiveBadge" style="display:none">
+        <span class="beta-live-badge"><span class="beta-live-dot"></span>BETA LIVE</span>
+      </span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn-analyze" id="btnAnalyze" onclick="runAnalysis()">🤖 Analyze Reports &amp; Generate Fix</button>
+      <button class="btn-publish" id="btnPublish" onclick="publishBeta()" style="display:none">⚗ Publish Beta</button>
+      <button class="btn-promote" id="btnPromote" onclick="promoteBeta()" style="display:none">✓ Promote to Stable</button>
+      <button class="btn-revert"  id="btnRevert"  onclick="clearBeta()"   style="display:none">✕ Revert Beta</button>
+    </div>
+  </div>
+  <div class="autopilot-body">
+    <div class="autopilot-status" id="autopilotStatus">
+      Analyze pending reports to generate a beta code fix. The button activates when a type reaches the threshold.
+    </div>
+    <div id="diagnosisWrap" style="display:none">
+      <div class="diagnosis-label">🔍 Claude's Diagnosis &amp; Proposed Changes</div>
+      <div class="diagnosis-box" id="diagnosisBox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap" style="margin-top:16px">
   <table>
     <thead>
       <tr>
@@ -673,7 +815,241 @@
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  (async () => { loadThreshold(); if (await checkAuth()) loadLogs(); })();
+  // ── AutoPilot: beta state ─────────────────────────────────────────────────
+  let _pendingHtml     = null;   // generated HTML waiting to be published
+  let _pendingDiagnosis = null;  // diagnosis text for display
+  let _betaIsLive      = false;  // true when a published beta exists in Firestore
+
+  // Called on load and after any beta action — syncs UI to Firestore state
+  async function syncBetaState() {
+    try {
+      const r = await fetch(`${BASE}/counter?action=getBeta`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+
+      _betaIsLive = data.exists && (data.status === "published" || data.status === "promoted");
+
+      document.getElementById("betaLiveBadge").style.display = _betaIsLive ? "inline-flex" : "none";
+      document.getElementById("btnRevert").style.display     = data.exists ? "inline-flex" : "none";
+      document.getElementById("btnPromote").style.display    = _betaIsLive ? "inline-flex" : "none";
+      document.getElementById("btnPublish").style.display    = "none"; // only show after analysis
+
+      if (data.exists) {
+        const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
+        document.getElementById("autopilotStatus").textContent =
+          `Beta version live — generated ${ts} from ${data.reportCount || "?"} ${data.type || ""} reports. Status: ${data.status}.`;
+        if (data.diagnosis) {
+          document.getElementById("diagnosisBox").textContent = data.diagnosis;
+          document.getElementById("diagnosisWrap").style.display = "block";
+        }
+      } else {
+        document.getElementById("autopilotStatus").textContent =
+          "No beta version active. Analyze reports to generate one.";
+        document.getElementById("diagnosisWrap").style.display = "none";
+        _pendingHtml = null;
+        _pendingDiagnosis = null;
+      }
+    } catch (e) {
+      console.warn("syncBetaState error:", e.message);
+    }
+  }
+
+  // ── AutoPilot: run analysis ───────────────────────────────────────────────
+  async function runAnalysis() {
+    const threshold = parseInt(localStorage.getItem(THRESHOLD_KEY)) || 5;
+    const bugs     = parseInt(document.getElementById("fbBugs").textContent)     || 0;
+    const features = parseInt(document.getElementById("fbFeatures").textContent) || 0;
+
+    // Determine which type crossed the threshold (bugs take priority if both)
+    const analyzeType = bugs >= threshold ? "bug" : features >= threshold ? "feature" : null;
+    if (!analyzeType) {
+      alert(`Neither bugs (${bugs}) nor features (${features}) have reached the threshold of ${threshold} yet.`);
+      return;
+    }
+
+    const btn = document.getElementById("btnAnalyze");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Analyzing...`;
+    document.getElementById("autopilotStatus").textContent = "Reading reports and generating fix — this may take 30–60 seconds...";
+    document.getElementById("diagnosisWrap").style.display = "none";
+    document.getElementById("btnPublish").style.display = "none";
+    _pendingHtml = null;
+
+    try {
+      // Collect pending reports of the triggering type
+      const reports = allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
+      if (reports.length === 0) {
+        alert("No pending reports of the threshold type. Mark some as pending first.");
+        btn.disabled = false;
+        btn.innerHTML = "🤖 Analyze Reports &amp; Generate Fix";
+        return;
+      }
+
+      // Fetch current index.html to give Claude full context
+      const siteR = await fetch("https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html");
+      const currentHtml = await siteR.text();
+
+      // Build prompt
+      const reportsText = reports.map((r, i) =>
+        `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown date"}): ${r.text}`
+      ).join("\n");
+
+      const prompt = `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
+
+The admin has collected ${reports.length} user ${analyzeType} report(s) that have crossed the AutoPilot action threshold. Your job is to:
+1. Read all the reports carefully
+2. Group similar/related reports together  
+3. Diagnose the root cause(s)
+4. Implement ALL the fixes/features directly into the provided HTML
+5. Return the complete updated HTML file
+
+USER REPORTS (${analyzeType}s):
+${reportsText}
+
+CURRENT index.html:
+${currentHtml}
+
+INSTRUCTIONS:
+- Implement every reasonable request. If multiple reports describe the same issue, fix it once.
+- Preserve ALL existing functionality — do not remove features.
+- Keep the steampunk/vintage aesthetic.
+- Your response must be in this exact format with no deviation:
+
+DIAGNOSIS:
+[2-5 sentences explaining what you found, grouped by theme, and what you changed]
+
+HTML:
+[The complete updated index.html file, starting with <!DOCTYPE html> and ending with </html>]`;
+
+      // Call Claude API
+      const apiR = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8192,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!apiR.ok) {
+        const err = await apiR.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Claude API ${apiR.status}`);
+      }
+
+      const apiData = await apiR.json();
+      const fullResponse = apiData.content[0].text;
+
+      // Parse diagnosis and HTML from response
+      const diagMatch   = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nHTML:)/i);
+      const htmlMatch   = fullResponse.match(/HTML:\s*(<!DOCTYPE[\s\S]*<\/html>)/i);
+
+      if (!htmlMatch) throw new Error("Claude did not return valid HTML. Check the diagnosis and try again.");
+
+      _pendingDiagnosis = diagMatch ? diagMatch[1].trim() : "No diagnosis provided.";
+      _pendingHtml      = htmlMatch[1].trim();
+
+      // Show diagnosis and enable publish
+      document.getElementById("diagnosisBox").textContent = _pendingDiagnosis;
+      document.getElementById("diagnosisWrap").style.display = "block";
+      document.getElementById("btnPublish").style.display = "inline-flex";
+      document.getElementById("autopilotStatus").textContent =
+        `Analysis complete — ${reports.length} ${analyzeType} report(s) addressed. Review the diagnosis above, then click "Publish Beta" to make it live.`;
+
+    } catch (e) {
+      document.getElementById("autopilotStatus").textContent = `Analysis failed: ${e.message}`;
+      console.error("runAnalysis error:", e);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = "🤖 Analyze Reports &amp; Generate Fix";
+  }
+
+  // ── AutoPilot: publish beta ───────────────────────────────────────────────
+  async function publishBeta() {
+    if (!_pendingHtml) { alert("No generated HTML to publish. Run analysis first."); return; }
+    if (!confirm("Publish this as the beta version? Users who click 'Use Beta Version' will see it immediately.")) return;
+
+    const btn = document.getElementById("btnPublish");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Publishing...`;
+
+    try {
+      const threshold  = parseInt(localStorage.getItem(THRESHOLD_KEY)) || 5;
+      const bugs       = parseInt(document.getElementById("fbBugs").textContent) || 0;
+      const features   = parseInt(document.getElementById("fbFeatures").textContent) || 0;
+      const analyzeType = bugs >= threshold ? "bug" : "feature";
+      const reports    = allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
+
+      const r = await fetch(`${BASE}/counter?action=publishBeta`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html: _pendingHtml,
+          diagnosis: _pendingDiagnosis,
+          type: analyzeType,
+          reportCount: reports.length
+        })
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+      // Mark all addressed reports as "reviewed"
+      const updatePromises = reports.map(rep =>
+        fetch(`${BASE}/counter?action=updateFeedbackStatus`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: rep.id, status: "reviewed" })
+        })
+      );
+      await Promise.allSettled(updatePromises);
+
+      await syncBetaState();
+      await loadFeedback();
+    } catch (e) {
+      alert("Publish failed: " + e.message);
+      btn.disabled = false;
+      btn.innerHTML = "⚗ Publish Beta";
+    }
+  }
+
+  // ── AutoPilot: promote beta to stable ────────────────────────────────────
+  async function promoteBeta() {
+    if (!confirm("Promote beta to stable? This marks it as the new A version. The beta stays available until cleared.")) return;
+    const btn = document.getElementById("btnPromote");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Promoting...`;
+    try {
+      const r = await fetch(`${BASE}/counter?action=promoteBeta`, { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await syncBetaState();
+    } catch (e) {
+      alert("Promote failed: " + e.message);
+      btn.disabled = false;
+      btn.innerHTML = "✓ Promote to Stable";
+    }
+  }
+
+  // ── AutoPilot: clear/revert beta ─────────────────────────────────────────
+  async function clearBeta() {
+    if (!confirm("Remove the beta version? The 'Use Beta Version' button will grey out on the site immediately.")) return;
+    const btn = document.getElementById("btnRevert");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Reverting...`;
+    try {
+      const r = await fetch(`${BASE}/counter?action=clearBeta`, { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      _pendingHtml = null;
+      _pendingDiagnosis = null;
+      document.getElementById("btnPublish").style.display = "none";
+      await syncBetaState();
+    } catch (e) {
+      alert("Revert failed: " + e.message);
+      btn.disabled = false;
+      btn.innerHTML = "✕ Revert Beta";
+    }
+  }
+
+  (async () => { loadThreshold(); if (await checkAuth()) { loadLogs(); syncBetaState(); } })();
 </script>
 </body>
 </html>

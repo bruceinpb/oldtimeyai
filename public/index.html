@@ -2036,7 +2036,85 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         }
 
         function loadBetaVersion() {
-            // Placeholder — will be wired up in Phase 2
+            // Stub — wired below at page load
+        }
+
+        // ── AutoPilot: Beta version loader ───────────────────────────────────
+
+        const BETA_ENDPOINT = `${API_BASE}/counter?action=getBeta`;
+        const _isBetaSession = sessionStorage.getItem('using_beta') === 'true';
+
+        // On page load: check if beta exists and activate/deactivate the button
+        async function initBetaButton() {
+            try {
+                const r = await fetch(BETA_ENDPOINT);
+                if (!r.ok) return;
+                const data = await r.json();
+                const betaBtn = document.getElementById('betaBtn');
+                if (data.exists && (data.status === 'published' || data.status === 'promoted')) {
+                    // Beta is live — enable the button
+                    betaBtn.classList.remove('disabled');
+                    betaBtn.title = 'Switch to beta version with latest fixes';
+                    betaBtn.onclick = applyBetaVersion;
+                } else {
+                    betaBtn.classList.add('disabled');
+                    betaBtn.title = 'No beta version available yet';
+                }
+            } catch (e) {
+                console.warn('Beta check failed:', e.message);
+            }
+        }
+
+        // Called when user clicks "Use Beta Version"
+        async function applyBetaVersion() {
+            const betaBtn = document.getElementById('betaBtn');
+            betaBtn.textContent = '⚗ Loading...';
+            try {
+                const r = await fetch(BETA_ENDPOINT);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const data = await r.json();
+                if (!data.exists || !data.html) throw new Error('No beta HTML found.');
+
+                // Mark session as beta before swapping
+                sessionStorage.setItem('using_beta', 'true');
+
+                // Replace entire page with beta HTML (+ inject revert banner)
+                const betaHtml = injectRevertBanner(data.html);
+                document.open();
+                document.write(betaHtml);
+                document.close();
+
+            } catch (e) {
+                betaBtn.textContent = '⚗ Use Beta Version';
+                showToast('⚠ Could not load beta: ' + e.message);
+            }
+        }
+
+        // Injects a persistent top banner into the beta HTML so users can revert
+        function injectRevertBanner(html) {
+            const banner = `
+<div id="betaRevertBanner" style="
+  position:fixed;top:0;left:0;right:0;z-index:99999;
+  background:#0d2a3d;border-bottom:2px solid #58a6ff;
+  padding:8px 16px;display:flex;align-items:center;justify-content:space-between;
+  font-family:'Special Elite',monospace;font-size:13px;color:#58a6ff;
+">
+  <span>⚗ You are using the <strong>Beta Version</strong> — features may be unstable.</span>
+  <button onclick="sessionStorage.removeItem('using_beta');location.reload();" style="
+    background:#3d1a1a;border:1px solid #da3633;color:#da3633;
+    padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;
+  ">✕ Return to Stable</button>
+</div>
+<div style="height:44px"></div>`;
+            // Insert banner right after <body>
+            return html.replace(/<body[^>]*>/, (match) => match + banner);
+        }
+
+        // Auto-load beta if this session was already in beta (page reload)
+        if (_isBetaSession) {
+            applyBetaVersion();
+        } else {
+            initBetaButton();
         }
 
         // Close feedback modal on overlay click
