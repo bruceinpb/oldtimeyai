@@ -1114,6 +1114,16 @@
             cursor: not-allowed;
             pointer-events: none;
         }
+        /* Flash when a new beta has just been published */
+        .btn-beta.beta-available {
+            animation: betaFlash 1.6s ease-in-out infinite;
+            border-color: var(--gold, #d4a017);
+            background: #2a2000;
+        }
+        @keyframes betaFlash {
+            0%, 100% { box-shadow: none;                              opacity: 1; }
+            50%       { box-shadow: 0 0 18px rgba(212,160,23,0.85);  opacity: 0.85; }
+        }
 
         /* ── AutoPilot: Feedback Modal ───────────────────────────── */
         .feedback-overlay {
@@ -2039,30 +2049,60 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             // Stub — wired below at page load
         }
 
-        // ── AutoPilot: Beta version loader ───────────────────────────────────
+        // ── AutoPilot: Beta version loader + live poller ─────────────────────
 
         const BETA_ENDPOINT = `${API_BASE}/counter?action=getBeta`;
         const _isBetaSession = sessionStorage.getItem('using_beta') === 'true';
+        let _betaPollerInterval = null;
+        let _lastKnownBetaCreatedAt = null;
 
-        // On page load: check if beta exists and activate/deactivate the button
-        async function initBetaButton() {
+        // Update beta button state — called on load and every 5 min by poller
+        async function checkBetaStatus() {
             try {
                 const r = await fetch(BETA_ENDPOINT);
                 if (!r.ok) return;
                 const data = await r.json();
                 const betaBtn = document.getElementById('betaBtn');
-                if (data.exists && (data.status === 'published' || data.status === 'promoted')) {
-                    // Beta is live — enable the button
+                if (!betaBtn) return;
+
+                const isLive = data.exists && (data.status === 'published' || data.status === 'promoted');
+
+                if (isLive) {
+                    // Enable button
                     betaBtn.classList.remove('disabled');
-                    betaBtn.title = 'Switch to beta version with latest fixes';
                     betaBtn.onclick = applyBetaVersion;
+
+                    // Flash if this is a NEW beta (different createdAt than last known)
+                    const isNew = data.createdAt && data.createdAt !== _lastKnownBetaCreatedAt;
+                    if (isNew) {
+                        _lastKnownBetaCreatedAt = data.createdAt;
+                        betaBtn.classList.add('beta-available');
+                        betaBtn.title = '✨ New beta version available — click to try it!';
+                        // Show toast if page was already open (not first load)
+                        if (_lastKnownBetaCreatedAt !== null) {
+                            showToast('⚗ A new Beta Version is now available!');
+                        }
+                    } else {
+                        betaBtn.title = 'Beta version available — click to try it';
+                    }
                 } else {
+                    // No beta — grey out, stop flashing
                     betaBtn.classList.add('disabled');
+                    betaBtn.classList.remove('beta-available');
                     betaBtn.title = 'No beta version available yet';
+                    _lastKnownBetaCreatedAt = null;
                 }
             } catch (e) {
                 console.warn('Beta check failed:', e.message);
             }
+        }
+
+        // Start the 5-minute client-side poller
+        function startBetaPoller() {
+            // Check immediately on load
+            checkBetaStatus();
+            // Then poll every 5 minutes (300,000ms)
+            _betaPollerInterval = setInterval(checkBetaStatus, 5 * 60 * 1000);
         }
 
         // Called when user clicks "Use Beta Version"
@@ -2074,6 +2114,9 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const data = await r.json();
                 if (!data.exists || !data.html) throw new Error('No beta HTML found.');
+
+                // Stop poller before swap
+                if (_betaPollerInterval) clearInterval(_betaPollerInterval);
 
                 // Mark session as beta before swapping
                 sessionStorage.setItem('using_beta', 'true');
@@ -2114,7 +2157,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         if (_isBetaSession) {
             applyBetaVersion();
         } else {
-            initBetaButton();
+            startBetaPoller();
         }
 
         // Close feedback modal on overlay click

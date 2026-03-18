@@ -608,7 +608,7 @@ exports.counter = onRequest(
         await db.collection("config").doc("betaVersion").set({
           html, diagnosis, type: triggerType,
           reportCount: triggerReports.length,
-          status: "pending_review",
+          status: "published",   // published directly — fully autonomous, no admin approval needed
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           promotedAt: null,
           autoTriggered: true,
@@ -616,10 +616,10 @@ exports.counter = onRequest(
         });
         await db.collection("config").doc("analysisQueue").delete().catch(() => {});
 
-        logger.info("Heartbeat: SUCCESS — beta saved as pending_review", {
+        logger.info("Heartbeat: SUCCESS — beta published automatically", {
           type: triggerType, reportCount: triggerReports.length, htmlLength: html.length
         });
-        return res.json({ ok: true, message: "Analysis complete — beta saved as pending_review", type: triggerType, reportCount: triggerReports.length });
+        return res.json({ ok: true, message: "Beta published automatically", type: triggerType, reportCount: triggerReports.length });
 
       } catch (err) {
         logger.error("Heartbeat error", { message: err.message, stack: err.stack });
