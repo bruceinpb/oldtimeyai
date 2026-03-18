@@ -21,6 +21,16 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
           channelId: live
           projectId: oldtimeyai-928be
+      - name: Clean up stale autopilotHeartbeat function
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
+        run: |
+          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
+          # Delete the stale autopilotHeartbeat entry if it exists — ignore errors
+          npx firebase-tools@latest functions:delete autopilotHeartbeat \
+            --project oldtimeyai-928be --region us-central1 --force 2>/dev/null || true
+          echo "Cleanup complete (errors ignored)"
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
@@ -36,10 +46,8 @@ jobs:
           gcloud auth activate-service-account --key-file=/tmp/sa_key.json
           gcloud config set project oldtimeyai-928be
 
-          # The heartbeat endpoint on the already-deployed counter function
           HEARTBEAT_URL="https://counter-4xrdo3u3ra-uc.a.run.app?action=heartbeat"
 
-          # Try to update the job first; if it doesn't exist, create it
           if gcloud scheduler jobs describe autopilot-heartbeat --location=us-central1 --quiet 2>/dev/null; then
             echo "Scheduler job exists — updating..."
             gcloud scheduler jobs update http autopilot-heartbeat \
