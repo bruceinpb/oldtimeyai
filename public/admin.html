@@ -672,25 +672,6 @@
     })
     .catch(e => alert("Save failed: " + e.message));
   }
-    const val = parseInt(document.getElementById("heartbeatInput").value);
-    if (isNaN(val) || val < 5 || val > 1440) {
-      alert("Heartbeat interval must be between 5 and 1440 minutes.");
-      return;
-    }
-    localStorage.setItem("autopilot_heartbeat_interval", val);
-    fetch(`${BASE}/counter?action=saveSettings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ heartbeatInterval: val })
-    })
-    .then(r => r.json())
-    .then(() => {
-      const btn = document.querySelectorAll(".btn-save-threshold")[1];
-      btn.textContent = "✓ Saved";
-      setTimeout(() => btn.textContent = "Save", 1500);
-    })
-    .catch(e => alert("Save failed: " + e.message));
-  }
 
   function saveThreshold() {
     const val = parseInt(document.getElementById("thresholdInput").value);
