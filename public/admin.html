@@ -488,9 +488,9 @@
 
 <div class="fb-stats">
   <div class="stat-card" id="cardTotal"><div class="label">Total Reports</div><div class="value" id="fbTotal">—</div></div>
-  <div class="stat-card" id="cardBugs"><div class="label">Pending Bugs</div><div class="value" id="fbBugs" style="color:#f07070">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
-  <div class="stat-card" id="cardFeatures"><div class="label">Pending Features</div><div class="value" id="fbFeatures" style="color:#80b8ff">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
-  <div class="stat-card" id="cardPending"><div class="label">Total Pending</div><div class="value" id="fbPending" style="color:#e09000">—</div></div>
+  <div class="stat-card" id="cardBugs"><div class="label">Bugs</div><div class="value" id="fbBugs" style="color:#f07070">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
+  <div class="stat-card" id="cardFeatures"><div class="label">Features</div><div class="value" id="fbFeatures" style="color:#80b8ff">—</div><div class="threshold-alert-label">⚠ THRESHOLD MET</div></div>
+  <div class="stat-card" id="cardPending"><div class="label">Pending</div><div class="value" id="fbPending" style="color:#e09000">—</div></div>
   <div class="threshold-card">
     <div class="label">⚙ AutoPilot Threshold</div>
     <div class="threshold-row">
@@ -507,6 +507,14 @@
       <button class="btn-save-threshold" onclick="saveHeartbeat()">Save</button>
     </div>
     <div class="threshold-hint" id="heartbeatHint">Last run: checking...</div>
+  </div>
+  <div class="threshold-card">
+    <div class="label">🚦 Reports/hr Limit</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="rateLimitInput" min="1" max="60" value="3" style="width:64px" />
+      <button class="btn-save-threshold" id="btnSaveRateLimit" onclick="saveRateLimit()">Save</button>
+    </div>
+    <div class="threshold-hint">Max reports per user per hour (1–60)</div>
   </div>
 </div>
 
@@ -587,7 +595,7 @@
     const saved = localStorage.getItem(THRESHOLD_KEY);
     const val = saved ? parseInt(saved) : 5;
     document.getElementById("thresholdInput").value = val;
-    // Pull both threshold and heartbeat interval from Firestore
+    // Pull threshold, heartbeat interval, and rate limit from Firestore
     fetch(`${BASE}/counter?action=getSettings`)
       .then(r => r.json())
       .then(data => {
@@ -598,6 +606,10 @@
         if (data.heartbeatInterval) {
           document.getElementById("heartbeatInput").value = data.heartbeatInterval;
           localStorage.setItem("autopilot_heartbeat_interval", data.heartbeatInterval);
+        }
+        if (data.rateLimit) {
+          document.getElementById("rateLimitInput").value = data.rateLimit;
+          localStorage.setItem("autopilot_rate_limit", data.rateLimit);
         }
         // Show last heartbeat time
         const hint = document.getElementById("heartbeatHint");
@@ -611,13 +623,55 @@
       .catch(() => {
         document.getElementById("heartbeatHint").textContent = "Last run: unavailable";
       });
-    // Also set heartbeat from localStorage while Firestore loads
+    // Also set values from localStorage while Firestore loads
     const savedInterval = localStorage.getItem("autopilot_heartbeat_interval");
     if (savedInterval) document.getElementById("heartbeatInput").value = savedInterval;
+    const savedRateLimit = localStorage.getItem("autopilot_rate_limit");
+    if (savedRateLimit) document.getElementById("rateLimitInput").value = savedRateLimit;
     return val;
   }
 
+  function saveRateLimit() {
+    const val = parseInt(document.getElementById("rateLimitInput").value);
+    if (isNaN(val) || val < 1 || val > 60) {
+      alert("Rate limit must be between 1 and 60 reports per hour.");
+      return;
+    }
+    localStorage.setItem("autopilot_rate_limit", val);
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rateLimit: val })
+    })
+    .then(r => r.json())
+    .then(() => {
+      const btn = document.getElementById("btnSaveRateLimit");
+      btn.textContent = "✓ Saved";
+      setTimeout(() => btn.textContent = "Save", 1500);
+    })
+    .catch(e => alert("Save failed: " + e.message));
+  }
+
   function saveHeartbeat() {
+    const val = parseInt(document.getElementById("heartbeatInput").value);
+    if (isNaN(val) || val < 5 || val > 1440) {
+      alert("Heartbeat interval must be between 5 and 1440 minutes.");
+      return;
+    }
+    localStorage.setItem("autopilot_heartbeat_interval", val);
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heartbeatInterval: val })
+    })
+    .then(r => r.json())
+    .then(() => {
+      const btn = document.querySelectorAll(".btn-save-threshold")[1];
+      btn.textContent = "✓ Saved";
+      setTimeout(() => btn.textContent = "Save", 1500);
+    })
+    .catch(e => alert("Save failed: " + e.message));
+  }
     const val = parseInt(document.getElementById("heartbeatInput").value);
     if (isNaN(val) || val < 5 || val > 1440) {
       alert("Heartbeat interval must be between 5 and 1440 minutes.");

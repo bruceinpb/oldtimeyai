@@ -153,20 +153,24 @@ exports.counter = onRequest(
           return res.status(400).json({ error: "Feedback text is required." });
         }
 
-        // Soft rate limit: 3 reports per IP per hour
+        // Rate limit: read from Firestore settings (default 3, admin-configurable up to 60)
+        const rlSettingsDoc = await db.collection("config").doc("settings").get();
+        const rateLimit = Math.min(60, Math.max(1, rlSettingsDoc.exists ? (rlSettingsDoc.data().rateLimit || 3) : 3));
+
+        // Soft rate limit: N reports per IP per hour
         const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         // Single-field query only (avoids composite index requirement)
         const recentSnap = await db.collection("feedbackReports")
           .where("ip", "==", ip)
-          .limit(10)
+          .limit(60)
           .get();
         const recentCount = recentSnap.docs.filter(doc => {
           const ts = doc.data().timestamp?.toDate?.();
           return ts && ts >= oneHourAgo;
         }).length;
-        if (recentCount >= 3) {
-          return res.status(429).json({ error: "Too many reports. Please wait an hour before submitting again." });
+        if (recentCount >= rateLimit) {
+          return res.status(429).json({ error: `Too many reports. You can submit up to ${rateLimit} per hour. Please wait and try again.` });
         }
 
         const reportType = type === "feature" ? "feature" : "bug";
@@ -256,10 +260,8 @@ exports.counter = onRequest(
         });
 
         // Summary counts
-        // Only count PENDING reports for threshold display and triggering.
-        // Reviewed/implemented/dismissed reports should not count toward the threshold.
-        const bugCount     = reports.filter(r => r.type === "bug"     && r.status === "pending").length;
-        const featureCount = reports.filter(r => r.type === "feature" && r.status === "pending").length;
+        const bugCount     = reports.filter(r => r.type === "bug").length;
+        const featureCount = reports.filter(r => r.type === "feature").length;
         const pendingCount = reports.filter(r => r.status === "pending").length;
 
         return res.json({ total: reports.length, bugCount, featureCount, pendingCount, reports });
@@ -445,8 +447,9 @@ exports.counter = onRequest(
         const doc = await db.collection("config").doc("settings").get();
         const threshold          = doc.exists ? (doc.data().threshold          || 5)  : 5;
         const heartbeatInterval  = doc.exists ? (doc.data().heartbeatInterval  || 5)  : 5;
+        const rateLimit          = doc.exists ? (doc.data().rateLimit          || 3)  : 3;
         const lastHeartbeatAt    = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
-        return res.json({ threshold, heartbeatInterval, lastHeartbeatAt });
+        return res.json({ threshold, heartbeatInterval, rateLimit, lastHeartbeatAt });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -455,7 +458,7 @@ exports.counter = onRequest(
     // ── Settings: POST /counter?action=saveSettings ───────────────────────────
     if (req.method === "POST" && req.query.action === "saveSettings") {
       try {
-        const { threshold, heartbeatInterval } = req.body || {};
+        const { threshold, heartbeatInterval, rateLimit } = req.body || {};
         const updates = {};
         if (threshold !== undefined) {
           const val = parseInt(threshold);
@@ -467,6 +470,11 @@ exports.counter = onRequest(
           // Allow 5–1440 minutes (1 min minimum tick is every 5min so floor to 5)
           if (isNaN(val) || val < 5 || val > 1440) return res.status(400).json({ error: "Heartbeat interval must be 5–1440 minutes." });
           updates.heartbeatInterval = val;
+        }
+        if (rateLimit !== undefined) {
+          const val = parseInt(rateLimit);
+          if (isNaN(val) || val < 1 || val > 60) return res.status(400).json({ error: "Rate limit must be 1–60 reports per hour." });
+          updates.rateLimit = val;
         }
         if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to save." });
         await db.collection("config").doc("settings").set(updates, { merge: true });
