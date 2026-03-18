@@ -313,12 +313,32 @@ exports.counter = onRequest(
 
     // ── Beta: POST /counter?action=publishBeta ────────────────────────────────
     // Saves generated HTML + metadata as the beta version, status = "published"
+    // Also atomically marks all pending reports of the analyzed type as "reviewed"
+    // so bug/feature counters reset to zero immediately.
     if (req.method === "POST" && req.query.action === "publishBeta") {
       try {
         const { html, diagnosis, type, reportCount } = req.body || {};
         if (!html || typeof html !== "string" || html.length < 100) {
           return res.status(400).json({ error: "Missing or invalid html." });
         }
+
+        // Mark all pending reports of this type as "reviewed" — server-side so it
+        // works regardless of whether the admin client has allFeedback loaded.
+        let markedCount = 0;
+        if (type && type !== "mixed") {
+          const pendingSnap = await db.collection("feedbackReports")
+            .where("status", "==", "pending")
+            .where("type", "==", type)
+            .get();
+          const batch = db.batch();
+          pendingSnap.forEach(doc => {
+            batch.update(doc.ref, { status: "reviewed" });
+            markedCount++;
+          });
+          if (markedCount > 0) await batch.commit();
+          logger.info("publishBeta: marked reports reviewed", { type, markedCount });
+        }
+
         await db.collection("config").doc("betaVersion").set({
           html,
           diagnosis: diagnosis || "",
@@ -328,8 +348,8 @@ exports.counter = onRequest(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           promotedAt: null
         });
-        logger.info("Beta version published", { type, reportCount });
-        return res.json({ ok: true });
+        logger.info("Beta version published", { type, reportCount, markedCount });
+        return res.json({ ok: true, markedCount });
       } catch (error) {
         logger.error("publishBeta error", { message: error.message });
         return res.status(500).json({ error: error.message });
