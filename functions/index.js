@@ -334,10 +334,21 @@ ${reportsText}
 CURRENT index.html:
 ${currentHtml}
 
+GALLERY CONTEXT (the four photo cards currently in the HTML):
+- Ancient World: photo-1555993539-1732b0258235
+- Medieval Era:  photo-1539037116277-4db20889f2d4
+- Victorian Age: photo-1596484552834-6a58f850e0a1
+- Industrial Era: photo-1518998053901-5348d3961a04  ← best candidate to swap for a woman
+
 INSTRUCTIONS:
 - Implement every reasonable request. If multiple reports describe the same issue, fix it once.
 - Preserve ALL existing functionality — do not remove features.
 - Keep the steampunk/vintage aesthetic.
+- FOR IMAGE REQUESTS: When adding or replacing photos, use ONLY these verified working Unsplash IDs.
+  For a historical woman (1750-1850 era), replace the Industrial Era card with this proven URL:
+  https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&h=500&fit=crop
+  Label it "Women of History". If that specific request is NOT in the reports, do not change images.
+- Do NOT invent Unsplash photo IDs — only use IDs that appear in the existing HTML or are provided above.
 - Your response must be in this EXACT format with no deviation:
 
 DIAGNOSIS:
@@ -873,10 +884,21 @@ ${reportsText}
 CURRENT index.html:
 ${currentHtml}
 
+GALLERY CONTEXT (the four photo cards currently in the HTML):
+- Ancient World: photo-1555993539-1732b0258235
+- Medieval Era:  photo-1539037116277-4db20889f2d4
+- Victorian Age: photo-1596484552834-6a58f850e0a1
+- Industrial Era: photo-1518998053901-5348d3961a04  ← best candidate to swap for a woman
+
 INSTRUCTIONS:
 - Implement every reasonable request. If multiple reports describe the same issue, fix it once.
 - Preserve ALL existing functionality — do not remove features.
 - Keep the steampunk/vintage aesthetic.
+- FOR IMAGE REQUESTS: When adding or replacing photos, use ONLY these verified working Unsplash IDs.
+  For a historical woman (1750-1850 era), replace the Industrial Era card with this proven URL:
+  https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&h=500&fit=crop
+  Label it "Women of History". If that specific request is NOT in the reports, do not change images.
+- Do NOT invent Unsplash photo IDs — only use IDs that appear in the existing HTML or are provided above.
 - Your response must be in this EXACT format with no deviation:
 
 DIAGNOSIS:
