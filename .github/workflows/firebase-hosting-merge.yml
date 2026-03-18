@@ -28,3 +28,40 @@ jobs:
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
           npx firebase-tools@latest deploy --only functions --project oldtimeyai-928be --force
+      - name: Create or Update AutoPilot Heartbeat Scheduler Job
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
+        run: |
+          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
+          gcloud auth activate-service-account --key-file=/tmp/sa_key.json
+          gcloud config set project oldtimeyai-928be
+
+          # The heartbeat endpoint on the already-deployed counter function
+          HEARTBEAT_URL="https://counter-4xrdo3u3ra-uc.a.run.app?action=heartbeat"
+
+          # Try to update the job first; if it doesn't exist, create it
+          if gcloud scheduler jobs describe autopilot-heartbeat --location=us-central1 --quiet 2>/dev/null; then
+            echo "Scheduler job exists — updating..."
+            gcloud scheduler jobs update http autopilot-heartbeat \
+              --location=us-central1 \
+              --schedule="*/5 * * * *" \
+              --uri="${HEARTBEAT_URL}" \
+              --http-method=POST \
+              --message-body="{}" \
+              --headers="Content-Type=application/json" \
+              --time-zone="America/New_York" \
+              --quiet
+          else
+            echo "Creating scheduler job..."
+            gcloud scheduler jobs create http autopilot-heartbeat \
+              --location=us-central1 \
+              --schedule="*/5 * * * *" \
+              --uri="${HEARTBEAT_URL}" \
+              --http-method=POST \
+              --message-body="{}" \
+              --headers="Content-Type=application/json" \
+              --time-zone="America/New_York" \
+              --description="OldTimeyAI AutoPilot heartbeat — checks feedback threshold every 5 min" \
+              --quiet
+          fi
+          echo "Scheduler job configured successfully."
