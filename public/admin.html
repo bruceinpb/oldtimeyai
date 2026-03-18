@@ -839,9 +839,12 @@
   // Called on load and after any beta action — syncs UI to Firestore state
   async function syncBetaState() {
     try {
-      const r = await fetch(`${BASE}/counter?action=getBeta`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const [betaRes, queueRes] = await Promise.all([
+        fetch(`${BASE}/counter?action=getBeta`),
+        fetch(`${BASE}/counter?action=getQueue`)
+      ]);
+      const data  = betaRes.ok  ? await betaRes.json()  : { exists: false };
+      const queue = queueRes.ok ? await queueRes.json() : { queued: false };
 
       _betaIsLive = data.exists && (data.status === "published" || data.status === "promoted");
       const isPendingReview = data.exists && data.status === "pending_review";
@@ -849,10 +852,9 @@
       document.getElementById("betaLiveBadge").style.display = _betaIsLive ? "inline-flex" : "none";
       document.getElementById("btnRevert").style.display  = data.exists  ? "inline-flex" : "none";
       document.getElementById("btnPromote").style.display = _betaIsLive  ? "inline-flex" : "none";
-      document.getElementById("btnPublish").style.display = "none"; // only shown after manual analysis
+      document.getElementById("btnPublish").style.display = "none";
 
       if (isPendingReview) {
-        // Auto-trigger produced a fix — load it and show Review & Publish UI
         const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
         document.getElementById("autopilotStatus").innerHTML =
           `<strong style="color:var(--gold)">🤖 AutoPilot has generated a fix!</strong> ` +
@@ -860,10 +862,22 @@
           `Review the diagnosis below, then publish.`;
         document.getElementById("diagnosisBox").textContent = data.diagnosis || "No diagnosis returned.";
         document.getElementById("diagnosisWrap").style.display = "block";
-        // Pre-load the HTML so Publish works without re-running analysis
-        _pendingHtml = data.html;
+        _pendingHtml      = data.html;
         _pendingDiagnosis = data.diagnosis;
         document.getElementById("btnPublish").style.display = "inline-flex";
+
+      } else if (queue.queued && !_betaIsLive && !isPendingReview) {
+        // Auto-trigger queued — admin panel picks it up and runs analysis
+        const ts = queue.queuedAt ? new Date(queue.queuedAt).toLocaleString() : "just now";
+        document.getElementById("autopilotStatus").innerHTML =
+          `<strong style="color:var(--gold)">🤖 AutoPilot threshold crossed!</strong> ` +
+          `${queue.reportCount} ${queue.type} report(s) queued at ${ts}. ` +
+          `<span class="spinner"></span> Running analysis automatically...`;
+        document.getElementById("diagnosisWrap").style.display = "none";
+        // Clear queue doc then run analysis
+        await fetch(`${BASE}/counter?action=clearQueue`, { method: "POST" });
+        // Small delay to let the UI paint, then fire
+        setTimeout(() => runAnalysis(queue.type), 300);
 
       } else if (_betaIsLive) {
         const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
@@ -875,7 +889,7 @@
           document.getElementById("diagnosisWrap").style.display = "block";
         }
 
-      } else if (!data.exists) {
+      } else {
         document.getElementById("autopilotStatus").textContent =
           "No beta version active. Reports will auto-trigger analysis when threshold is crossed, or click Analyze to run manually.";
         document.getElementById("diagnosisWrap").style.display = "none";
@@ -1037,7 +1051,15 @@
     }
   }
 
-  (async () => { loadThreshold(); if (await checkAuth()) { loadLogs(); syncBetaState(); } })();
+  (async () => {
+    loadThreshold();
+    if (await checkAuth()) {
+      loadLogs();
+      syncBetaState();
+      // Poll every 15s so auto-triggered queue is picked up even if tab was already open
+      setInterval(syncBetaState, 15000);
+    }
+  })();
 </script>
 </body>
 </html>

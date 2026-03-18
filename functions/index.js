@@ -13,7 +13,9 @@ const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 exports.counter = onRequest(
   { 
     cors: true,
-    invoker: "public"
+    invoker: "public",
+    timeoutSeconds: 540,
+    memory: "512MiB"
   },
   async (req, res) => {
 
@@ -108,22 +110,22 @@ exports.counter = onRequest(
         logger.info("Feedback saved", { type: reportType, ip });
 
         // ── Auto-trigger: check if threshold is now crossed ───────────────────
-        // Run async so we don't delay the user's response
+        // We write a queue doc to Firestore — the admin panel polls for it
+        // and calls ?action=analyze when it sees one. This avoids running
+        // the long Claude call inside this short-lived request.
         (async () => {
           try {
-            // Get threshold from Firestore settings
             const settingsDoc = await db.collection("config").doc("settings").get();
             const threshold = settingsDoc.exists ? (settingsDoc.data().threshold || 5) : 5;
 
-            // Don't re-trigger if beta already pending review or published
+            // Don't re-queue if beta already exists or queue already pending
             const betaDoc = await db.collection("config").doc("betaVersion").get();
             if (betaDoc.exists) {
-              const betaStatus = betaDoc.data().status;
-              if (betaStatus === "pending_review" || betaStatus === "published") {
-                logger.info("Auto-trigger skipped: beta already exists", { betaStatus });
-                return;
-              }
+              const s = betaDoc.data().status;
+              if (s === "pending_review" || s === "published" || s === "queued") return;
             }
+            const queueDoc = await db.collection("config").doc("analysisQueue").get();
+            if (queueDoc.exists && queueDoc.data().status === "queued") return;
 
             // Count pending reports of the saved type
             const allSnap = await db.collection("feedbackReports")
@@ -133,104 +135,18 @@ exports.counter = onRequest(
             const pendingCount = allSnap.size;
 
             logger.info("Auto-trigger check", { reportType, pendingCount, threshold });
+            if (pendingCount < threshold) return;
 
-            if (pendingCount < threshold) return; // not yet
-
-            // Threshold crossed — collect reports and run analysis
-            logger.info("Auto-trigger FIRING", { reportType, pendingCount });
-
-            const reports = [];
-            allSnap.forEach(doc => {
-              const d = doc.data();
-              reports.push({
-                id: doc.id,
-                text: d.text,
-                type: d.type,
-                timestamp: d.timestamp?.toDate?.()?.toISOString() || null
-              });
-            });
-
-            // Fetch current index.html
-            const siteRes = await fetch(
-              "https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html"
-            );
-            if (!siteRes.ok) throw new Error(`Could not fetch index.html: ${siteRes.status}`);
-            const currentHtml = await siteRes.text();
-
-            const reportsText = reports.map((r, i) =>
-              `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
-            ).join("\n");
-
-            const prompt = `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
-
-The AutoPilot system has automatically detected that ${reports.length} user ${reportType} report(s) have crossed the action threshold. Your job is to:
-1. Read all the reports carefully
-2. Group similar/related reports together
-3. Diagnose the root cause(s)
-4. Implement ALL the fixes/features directly into the provided HTML
-5. Return the complete updated HTML file
-
-USER REPORTS (${reportType}s):
-${reportsText}
-
-CURRENT index.html:
-${currentHtml}
-
-INSTRUCTIONS:
-- Implement every reasonable request. If multiple reports describe the same issue, fix it once.
-- Preserve ALL existing functionality — do not remove features.
-- Keep the steampunk/vintage aesthetic.
-- Your response must be in this EXACT format with no deviation:
-
-DIAGNOSIS:
-[2-5 sentences explaining what you found, grouped by theme, and what you changed]
-
-HTML:
-[The complete updated index.html file, starting with <!DOCTYPE html> and ending with </html>]`;
-
-            const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-api-key": anthropicApiKey.value(),
-                "anthropic-version": "2023-06-01"
-              },
-              body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 8192,
-                messages: [{ role: "user", content: prompt }]
-              })
-            });
-
-            if (!claudeRes.ok) throw new Error(`Claude API error: ${claudeRes.status}`);
-
-            const claudeData = await claudeRes.json();
-            const fullResponse = claudeData.content[0].text;
-
-            const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nHTML:)/i);
-            const htmlMatch = fullResponse.match(/HTML:\s*(<!DOCTYPE[\s\S]*<\/html>)/i);
-
-            if (!htmlMatch) throw new Error("Claude did not return valid HTML.");
-
-            const diagnosis = diagMatch ? diagMatch[1].trim() : "Auto-generated fix.";
-            const html      = htmlMatch[1].trim();
-
-            // Save as pending_review — admin must approve before it goes live
-            await db.collection("config").doc("betaVersion").set({
-              html,
-              diagnosis,
+            // Threshold crossed — write queue doc; admin panel will pick it up
+            logger.info("Auto-trigger: writing analysisQueue", { reportType, pendingCount });
+            await db.collection("config").doc("analysisQueue").set({
+              status: "queued",
               type: reportType,
-              reportCount: reports.length,
-              status: "pending_review",
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              promotedAt: null,
-              autoTriggered: true
+              reportCount: pendingCount,
+              queuedAt: admin.firestore.FieldValue.serverTimestamp()
             });
-
-            logger.info("Auto-trigger complete: beta saved as pending_review", { reportType, htmlLength: html.length });
-
           } catch (autoErr) {
-            logger.error("Auto-trigger error", { message: autoErr.message });
+            logger.error("Auto-trigger queue error", { message: autoErr.message });
           }
         })();
 
@@ -493,6 +409,27 @@ HTML:
         if (isNaN(val) || val < 1) return res.status(400).json({ error: "Invalid threshold." });
         await db.collection("config").doc("settings").set({ threshold: val }, { merge: true });
         return res.json({ ok: true, threshold: val });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Queue: GET /counter?action=getQueue ──────────────────────────────────
+    if (req.method === "GET" && req.query.action === "getQueue") {
+      try {
+        const doc = await db.collection("config").doc("analysisQueue").get();
+        if (!doc.exists) return res.json({ queued: false });
+        return res.json({ queued: true, ...doc.data(), queuedAt: doc.data().queuedAt?.toDate?.()?.toISOString() || null });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Queue: POST /counter?action=clearQueue ────────────────────────────────
+    if (req.method === "POST" && req.query.action === "clearQueue") {
+      try {
+        await db.collection("config").doc("analysisQueue").delete();
+        return res.json({ ok: true });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
