@@ -80,12 +80,16 @@ exports.counter = onRequest(
         // Soft rate limit: 3 reports per IP per hour
         const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        // Single-field query only (avoids composite index requirement)
         const recentSnap = await db.collection("feedbackReports")
           .where("ip", "==", ip)
-          .where("timestamp", ">=", oneHourAgo)
-          .limit(3)
+          .limit(10)
           .get();
-        if (recentSnap.size >= 3) {
+        const recentCount = recentSnap.docs.filter(doc => {
+          const ts = doc.data().timestamp?.toDate?.();
+          return ts && ts >= oneHourAgo;
+        }).length;
+        if (recentCount >= 3) {
           return res.status(429).json({ error: "Too many reports. Please wait an hour before submitting again." });
         }
 
