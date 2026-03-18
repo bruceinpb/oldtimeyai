@@ -58,7 +58,7 @@ jobs:
               --uri="${HEARTBEAT_URL}" \
               --http-method=POST \
               --message-body="{}" \
-              --headers="Content-Type=application/json" \
+              --update-headers="Content-Type=application/json" \
               --time-zone="America/New_York" \
               --quiet
           else
@@ -69,7 +69,7 @@ jobs:
               --uri="${HEARTBEAT_URL}" \
               --http-method=POST \
               --message-body="{}" \
-              --headers="Content-Type=application/json" \
+              --update-headers="Content-Type=application/json" \
               --time-zone="America/New_York" \
               --description="OldTimeyAI AutoPilot heartbeat — checks feedback threshold every 5 min" \
               --quiet
