@@ -9,6 +9,80 @@ const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
+
+// ── AutoPilot: shared prompt builder and patch applier ────────────────────────
+function buildAutoPilotPrompt(reports, type, currentHtml) {
+  const reportsText = reports.map((r, i) =>
+    `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
+  ).join("\n");
+
+  return `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
+
+The AutoPilot system has detected that ${reports.length} user ${type} report(s) have crossed the action threshold.
+
+USER REPORTS (${type}s):
+${reportsText}
+
+CURRENT index.html (${currentHtml.length} bytes):
+${currentHtml}
+
+YOUR TASK:
+1. Read all reports carefully and group similar ones
+2. Diagnose the root cause(s)
+3. Implement the fixes/features in the HTML
+
+RESPONSE FORMAT — you MUST use exactly this format:
+
+DIAGNOSIS:
+[2-5 sentences explaining what you found and what you changed]
+
+PATCHES:
+[One or more patches in this exact format — repeat as needed:]
+<<<FIND>>>
+[exact text from the current HTML to find — minimum 3 unique lines]
+<<<REPLACE>>>
+[replacement text]
+<<<END>>>
+
+RULES:
+- Each FIND block must be UNIQUE in the HTML — include enough context lines
+- Do NOT return the full HTML file — only the changed sections as patches
+- Do NOT use markdown code fences
+- Each patch replaces exactly the FIND text with the REPLACE text
+- If adding something new, include the surrounding anchor lines in FIND`;
+}
+
+function applyPatches(html, fullResponse) {
+  // Extract patches from response
+  const patchRegex = /<<<FIND>>>\n([\s\S]*?)<<<REPLACE>>>\n([\s\S]*?)<<<END>>>/g;
+  let patched = html;
+  let patchCount = 0;
+  let match;
+  const errors = [];
+
+  while ((match = patchRegex.exec(fullResponse)) !== null) {
+    const findText   = match[1];
+    const replaceText = match[2];
+    
+    if (patched.includes(findText)) {
+      patched = patched.replace(findText, replaceText);
+      patchCount++;
+    } else {
+      // Try trimmed version
+      const findTrimmed = findText.trim();
+      if (patched.includes(findTrimmed)) {
+        patched = patched.replace(findTrimmed, replaceText.trim());
+        patchCount++;
+      } else {
+        errors.push(`Patch not applied — FIND text not found: ${findText.substring(0,80)}...`);
+      }
+    }
+  }
+
+  return { patched, patchCount, errors };
+}
+
+
 // Visitor Counter + Admin Logs + Feedback endpoint
 exports.counter = onRequest(
   { 
@@ -318,32 +392,7 @@ exports.counter = onRequest(
           `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
         ).join("\n");
 
-        const prompt = `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
-
-The admin has collected ${reports.length} user ${type} report(s) that have crossed the AutoPilot threshold. Your job is to:
-1. Read all the reports carefully
-2. Group similar/related reports together
-3. Diagnose the root cause(s)
-4. Implement ALL the fixes/features directly into the provided HTML
-5. Return the complete updated HTML file
-
-USER REPORTS (${type}s):
-${reportsText}
-
-CURRENT index.html:
-${currentHtml}
-
-INSTRUCTIONS:
-- Implement every reasonable request. If multiple reports describe the same issue, fix it once.
-- Preserve ALL existing functionality — do not remove features.
-- Keep the steampunk/vintage aesthetic.
-- Your response must be in this EXACT format with no deviation:
-
-DIAGNOSIS:
-[2-5 sentences explaining what you found, grouped by theme, and what you changed]
-
-HTML:
-[The complete updated index.html file, starting with <!DOCTYPE html> and ending with </html>]`;
+        const prompt = buildAutoPilotPrompt(reports, type, currentHtml);
 
         logger.info("Running AutoPilot analysis", { type, reportCount: reports.length });
 
@@ -356,7 +405,7 @@ HTML:
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
-            max_tokens: 8192,
+            max_tokens: 4096,
             messages: [{ role: "user", content: prompt }]
           })
         });
@@ -370,19 +419,17 @@ HTML:
         const claudeData = await claudeRes.json();
         const fullResponse = claudeData.content[0].text;
 
-        const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nHTML:)/i);
-        const htmlMatch = fullResponse.match(/HTML:\s*(<!DOCTYPE[\s\S]*<\/html>)/i);
+        const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nPATCHES:)/i);
+        const diagnosis = diagMatch ? diagMatch[1].trim() : "Analysis complete.";
 
-        if (!htmlMatch) {
-          logger.error("Claude did not return valid HTML", { preview: fullResponse.substring(0, 300) });
-          throw new Error("Claude did not return valid HTML in the expected format.");
+        if (!fullResponse.includes("<<<FIND>>>")) {
+          logger.error("Claude did not return patches", { preview: fullResponse.substring(0, 300) });
+          throw new Error("Claude did not return patches in the expected format.");
         }
 
-        const diagnosis = diagMatch ? diagMatch[1].trim() : "Analysis complete.";
-        const html      = htmlMatch[1].trim();
-
-        logger.info("AutoPilot analysis complete", { type, diagLength: diagnosis.length, htmlLength: html.length });
-        return res.json({ ok: true, diagnosis, html, reportCount: reports.length, type });
+        const { patched, patchCount, errors } = applyPatches(currentHtml, fullResponse);
+        logger.info("AutoPilot analysis complete", { type, patchCount, errors: errors.length });
+        return res.json({ ok: true, diagnosis, html: patched, reportCount: reports.length, type, patchCount, patchErrors: errors });
 
       } catch (error) {
         logger.error("analyze error", { message: error.message, stack: error.stack });
@@ -528,36 +575,7 @@ HTML:
         const currentHtml = await siteRes.text();
 
         // ── 5. Call Claude ───────────────────────────────────────────────
-        const reportsText = triggerReports.map((r, i) =>
-          `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
-        ).join("\n");
-
-        const prompt = `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
-
-The AutoPilot heartbeat has detected that ${triggerReports.length} user ${triggerType} report(s) have crossed the action threshold. Your job is to:
-1. Read all the reports carefully
-2. Group similar/related reports together
-3. Diagnose the root cause(s)
-4. Implement ALL the fixes/features directly into the provided HTML
-5. Return the complete updated HTML file
-
-USER REPORTS (${triggerType}s):
-${reportsText}
-
-CURRENT index.html:
-${currentHtml}
-
-INSTRUCTIONS:
-- Implement every reasonable request. If multiple reports describe the same issue, fix it once.
-- Preserve ALL existing functionality — do not remove features.
-- Keep the steampunk/vintage aesthetic.
-- Your response must be in this EXACT format with no deviation:
-
-DIAGNOSIS:
-[2-5 sentences explaining what you found, grouped by theme, and what you changed]
-
-HTML:
-[The complete updated index.html file, starting with <!DOCTYPE html> and ending with </html>]`;
+        const prompt = buildAutoPilotPrompt(triggerReports, triggerType, currentHtml);
 
         logger.info("Heartbeat: calling Claude", { type: triggerType, reports: triggerReports.length });
         const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -569,7 +587,7 @@ HTML:
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
-            max_tokens: 8192,
+            max_tokens: 4096,
             messages: [{ role: "user", content: prompt }]
           })
         });
@@ -578,13 +596,14 @@ HTML:
         const claudeData   = await claudeRes.json();
         const fullResponse = claudeData.content[0].text;
 
-        // ── 6. Parse and save ────────────────────────────────────────────
-        const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nHTML:)/i);
-        const htmlMatch = fullResponse.match(/HTML:\s*(<!DOCTYPE[\s\S]*<\/html>)/i);
-        if (!htmlMatch) throw new Error("Claude did not return valid HTML.");
-
+        // ── 6. Parse patches and apply ───────────────────────────────────
+        const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nPATCHES:)/i);
         const diagnosis = diagMatch ? diagMatch[1].trim() : "AutoPilot heartbeat fix.";
-        const html      = htmlMatch[1].trim();
+
+        if (!fullResponse.includes("<<<FIND>>>")) throw new Error("Claude did not return patches in the expected format.");
+
+        const { patched: html, patchCount, errors: patchErrors } = applyPatches(currentHtml, fullResponse);
+        logger.info("Heartbeat patches applied", { patchCount, patchErrors: patchErrors.length });
 
         await db.collection("config").doc("betaVersion").set({
           html, diagnosis, type: triggerType,
