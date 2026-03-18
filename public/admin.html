@@ -175,14 +175,84 @@
       padding: 48px;
       font-style: italic;
     }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); opacity: 1; }
+    .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Feedback status badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+    .badge-pending    { background: #3d2b00; color: #e09000; }
+    .badge-reviewed   { background: #0d2a3d; color: var(--blue); }
+    .badge-implemented{ background: #0d2d17; color: var(--green); }
+    .badge-dismissed  { background: #1c1c1c; color: var(--text-dim); }
+    .badge-bug        { background: #3d1a1a; color: #f07070; }
+    .badge-feature    { background: #1a2a3d; color: #80b8ff; }
+
+    /* Feedback stats bar */
+    .fb-stats {
+      display: flex;
+      gap: 16px;
+      padding: 16px 24px 0;
+      flex-wrap: wrap;
+    }
+
+    select.status-select {
+      padding: 3px 6px;
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
 <header>
-  <h1><span class="gear">⚙</span> OldTimeyAI — Admin Log</h1>
+  <h1><span class="gear">⚙</span> OldTimeyAI — Admin</h1>
   <span id="loadingIndicator"></span>
 </header>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabChats" onclick="switchTab('chats')">💬 Chat Logs</button>
+  <button class="tab-btn" id="tabFeedback" onclick="switchTab('feedback')">📬 Feedback <span id="pendingBadge"></span></button>
+</div>
+
+<!-- ── CHAT LOGS TAB ──────────────────────────────────────────────── -->
+<div class="tab-panel active" id="panelChats">
 
 <div class="stats-bar">
   <div class="stat-card"><div class="label">Total Exchanges</div><div class="value" id="statTotal">—</div></div>
@@ -221,10 +291,59 @@
   </table>
 </div>
 
+</div><!-- /#panelChats -->
+
+<!-- ── FEEDBACK TAB ───────────────────────────────────────────────── -->
+<div class="tab-panel" id="panelFeedback">
+
+<div class="fb-stats">
+  <div class="stat-card"><div class="label">Total Reports</div><div class="value" id="fbTotal">—</div></div>
+  <div class="stat-card"><div class="label">Bugs</div><div class="value" id="fbBugs" style="color:#f07070">—</div></div>
+  <div class="stat-card"><div class="label">Features</div><div class="value" id="fbFeatures" style="color:#80b8ff">—</div></div>
+  <div class="stat-card"><div class="label">Pending</div><div class="value" id="fbPending" style="color:#e09000">—</div></div>
+</div>
+
+<div class="toolbar" style="margin-top:14px">
+  <input type="text" id="fbSearch" placeholder="Search reports..." oninput="renderFeedbackTable()" />
+  <select id="fbTypeFilter" onchange="renderFeedbackTable()">
+    <option value="">All types</option>
+    <option value="bug">Bugs</option>
+    <option value="feature">Features</option>
+  </select>
+  <select id="fbStatusFilter" onchange="renderFeedbackTable()">
+    <option value="">All statuses</option>
+    <option value="pending">Pending</option>
+    <option value="reviewed">Reviewed</option>
+    <option value="implemented">Implemented</option>
+    <option value="dismissed">Dismissed</option>
+  </select>
+  <button class="btn-refresh" onclick="loadFeedback()">⟳ Refresh</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Type</th>
+        <th>Report</th>
+        <th>Session Date</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="fbBody">
+      <tr><td colspan="5" class="empty">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /#panelFeedback -->
+
 <script>
   const BASE = "https://us-central1-oldtimeyai-928be.cloudfunctions.net";
   const HASH = "f1b328fed2db989af6b62de802db42c8be34075348d2c826400af25406e938c9";
   let allLogs = [];
+  let allFeedback = [];
 
   async function sha256(str) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
@@ -235,16 +354,26 @@
     const stored = sessionStorage.getItem("admin_auth");
     if (stored === HASH) return true;
     const pwd = prompt("Enter admin password:");
-    if (!pwd) { document.body.innerHTML = "<p style=\'color:#888;padding:2rem\'>Access denied.</p>"; return false; }
+    if (!pwd) { document.body.innerHTML = "<p style='color:#888;padding:2rem'>Access denied.</p>"; return false; }
     const hashed = await sha256(pwd);
     if (hashed === HASH) {
       sessionStorage.setItem("admin_auth", hashed);
       return true;
     }
-    document.body.innerHTML = "<p style=\'color:#888;padding:2rem\'>Incorrect password.</p>";
+    document.body.innerHTML = "<p style='color:#888;padding:2rem'>Incorrect password.</p>";
     return false;
   }
 
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+    document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+    if (tab === 'feedback' && allFeedback.length === 0) loadFeedback();
+  }
+
+  // ── Chat Logs ─────────────────────────────────────────────────────────────
   async function loadLogs() {
     document.getElementById("loadingIndicator").textContent = "Loading...";
     try {
@@ -322,11 +451,103 @@
     }
   }
 
+  // ── Feedback ──────────────────────────────────────────────────────────────
+  async function loadFeedback() {
+    document.getElementById("loadingIndicator").textContent = "Loading feedback...";
+    try {
+      const r = await fetch(`${BASE}/counter?action=feedback&limit=500`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+
+      document.getElementById("fbTotal").textContent    = data.total ?? "—";
+      document.getElementById("fbBugs").textContent     = data.bugCount ?? "—";
+      document.getElementById("fbFeatures").textContent = data.featureCount ?? "—";
+      document.getElementById("fbPending").textContent  = data.pendingCount ?? "—";
+
+      // Update pending badge on tab
+      const pb = document.getElementById("pendingBadge");
+      if (data.pendingCount > 0) {
+        pb.textContent = `(${data.pendingCount})`;
+        pb.style.color = "#e09000";
+      } else {
+        pb.textContent = "";
+      }
+
+      allFeedback = data.reports || [];
+      renderFeedbackTable();
+      document.getElementById("loadingIndicator").textContent = "";
+    } catch (e) {
+      document.getElementById("loadingIndicator").textContent = "";
+      document.getElementById("fbBody").innerHTML =
+        `<tr><td colspan="5" class="empty">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function renderFeedbackTable() {
+    const search     = (document.getElementById("fbSearch")?.value || "").toLowerCase();
+    const typeFilter = document.getElementById("fbTypeFilter")?.value || "";
+    const statusFilter = document.getElementById("fbStatusFilter")?.value || "";
+
+    let items = allFeedback.filter(r => {
+      if (typeFilter   && r.type   !== typeFilter)   return false;
+      if (statusFilter && r.status !== statusFilter) return false;
+      if (search && !r.text?.toLowerCase().includes(search)) return false;
+      return true;
+    });
+
+    if (items.length === 0) {
+      document.getElementById("fbBody").innerHTML =
+        `<tr><td colspan="5" class="empty">No reports found.</td></tr>`;
+      return;
+    }
+
+    const rows = items.map(r => {
+      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
+      return `<tr>
+        <td class="td-time">${ts}</td>
+        <td><span class="badge badge-${r.type}">${r.type}</span></td>
+        <td class="td-msg"><div class="truncate" onclick="this.classList.toggle('expanded')">${escHtml(r.text || "")}</div></td>
+        <td class="td-time">${escHtml(r.sessionDate || "—")}</td>
+        <td>
+          <select class="status-select" onchange="updateFeedbackStatus('${r.id}', this.value)">
+            ${["pending","reviewed","implemented","dismissed"].map(s =>
+              `<option value="${s}"${r.status===s?" selected":""}>${s}</option>`
+            ).join("")}
+          </select>
+        </td>
+      </tr>`;
+    }).join("");
+
+    document.getElementById("fbBody").innerHTML = rows;
+  }
+
+  async function updateFeedbackStatus(id, status) {
+    try {
+      const r = await fetch(`${BASE}/counter?action=updateFeedbackStatus`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status })
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      // Update local cache so re-renders stay in sync
+      const item = allFeedback.find(f => f.id === id);
+      if (item) item.status = status;
+      // Refresh pending count on tab
+      const pendingCount = allFeedback.filter(f => f.status === "pending").length;
+      document.getElementById("fbPending").textContent = pendingCount;
+      const pb = document.getElementById("pendingBadge");
+      pb.textContent = pendingCount > 0 ? `(${pendingCount})` : "";
+    } catch (e) {
+      alert("Status update failed: " + e.message);
+    }
+  }
+
   function escHtml(s) {
-    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
   (async () => { if (await checkAuth()) loadLogs(); })();
 </script>
 </body>
 </html>
+

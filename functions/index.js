@@ -9,14 +9,15 @@ const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
-// Visitor Counter + Admin Logs endpoint
+// Visitor Counter + Admin Logs + Feedback endpoint
 exports.counter = onRequest(
   { 
     cors: true,
     invoker: "public"
   },
   async (req, res) => {
-    // Admin logs: GET /counter?action=logs
+
+    // ── Admin logs: GET /counter?action=logs ─────────────────────────────────
     if (req.method === "GET" && req.query.action === "logs") {
       try {
         const limit = parseInt(req.query.limit) || 200;
@@ -52,7 +53,7 @@ exports.counter = onRequest(
       }
     }
 
-    // Admin logs: POST /counter?action=clearLogs
+    // ── Admin logs: POST /counter?action=clearLogs ───────────────────────────
     if (req.method === "POST" && req.query.action === "clearLogs") {
       try {
         const snapshot = await db.collection("chatLogs").limit(500).get();
@@ -66,7 +67,101 @@ exports.counter = onRequest(
       }
     }
 
-    // Default: visitor counter
+    // ── Feedback: POST /counter?action=feedback ──────────────────────────────
+    // Saves a user bug report or feature request to Firestore.
+    if (req.method === "POST" && req.query.action === "feedback") {
+      try {
+        const { text, type, sessionDate, context } = req.body || {};
+
+        if (!text || typeof text !== "string" || text.trim().length < 3) {
+          return res.status(400).json({ error: "Feedback text is required." });
+        }
+
+        // Soft rate limit: 3 reports per IP per hour
+        const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const recentSnap = await db.collection("feedbackReports")
+          .where("ip", "==", ip)
+          .where("timestamp", ">=", oneHourAgo)
+          .limit(3)
+          .get();
+        if (recentSnap.size >= 3) {
+          return res.status(429).json({ error: "Too many reports. Please wait an hour before submitting again." });
+        }
+
+        await db.collection("feedbackReports").add({
+          text: text.trim().substring(0, 2000),
+          type: type === "feature" ? "feature" : "bug",  // default to bug
+          sessionDate: sessionDate || null,
+          context: context || null,
+          ip,
+          userAgent: req.headers["user-agent"] || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          status: "pending"   // pending | reviewed | implemented | dismissed
+        });
+
+        logger.info("Feedback saved", { type, ip });
+        return res.json({ ok: true });
+      } catch (error) {
+        logger.error("saveFeedback error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Feedback: GET /counter?action=feedback ───────────────────────────────
+    // Returns all feedback reports for the admin panel.
+    if (req.method === "GET" && req.query.action === "feedback") {
+      try {
+        const limit = parseInt(req.query.limit) || 500;
+        const snapshot = await db.collection("feedbackReports")
+          .orderBy("timestamp", "desc")
+          .limit(limit)
+          .get();
+        const reports = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          reports.push({
+            id: doc.id,
+            text: d.text,
+            type: d.type,
+            sessionDate: d.sessionDate,
+            status: d.status,
+            timestamp: d.timestamp?.toDate?.()?.toISOString() || null,
+            ip: d.ip,
+            userAgent: d.userAgent
+          });
+        });
+
+        // Summary counts
+        const bugCount     = reports.filter(r => r.type === "bug").length;
+        const featureCount = reports.filter(r => r.type === "feature").length;
+        const pendingCount = reports.filter(r => r.status === "pending").length;
+
+        return res.json({ total: reports.length, bugCount, featureCount, pendingCount, reports });
+      } catch (error) {
+        logger.error("getFeedback error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Feedback: POST /counter?action=updateFeedbackStatus ─────────────────
+    // Updates the status of a feedback report (reviewed / implemented / dismissed).
+    if (req.method === "POST" && req.query.action === "updateFeedbackStatus") {
+      try {
+        const { id, status } = req.body || {};
+        const validStatuses = ["pending", "reviewed", "implemented", "dismissed"];
+        if (!id || !validStatuses.includes(status)) {
+          return res.status(400).json({ error: "Invalid id or status." });
+        }
+        await db.collection("feedbackReports").doc(id).update({ status });
+        return res.json({ ok: true });
+      } catch (error) {
+        logger.error("updateFeedbackStatus error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Default: visitor counter ─────────────────────────────────────────────
     try {
       const counterRef = db.collection("stats").doc("visitors");
       
@@ -355,4 +450,3 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
     }
   }
 );
-

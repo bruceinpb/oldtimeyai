@@ -1062,7 +1062,200 @@
                 min-height: 280px;
                 max-height: 280px;
             }
+
+            .date-machine-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .feedback-banners {
+                flex-direction: row;
+                width: 100%;
+                justify-content: center;
+            }
         }
+
+        /* ── AutoPilot: Feedback Banners ─────────────────────────── */
+        .date-machine-wrapper {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .feedback-banners {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-top: 60px; /* align with top of date machine */
+        }
+
+        .feedback-btn {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            padding: 18px 10px;
+            border-radius: 6px;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: 2px solid;
+            min-height: 130px;
+            white-space: nowrap;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .feedback-btn:hover { opacity: 0.85; transform: rotate(180deg) scale(1.04); }
+        .feedback-btn:active { transform: rotate(180deg) scale(0.97); }
+
+        .btn-report-bug {
+            background: #5c0000;
+            border-color: #cc2200;
+            color: #ff9980;
+            animation: bugFlash 1.4s ease-in-out infinite;
+        }
+        @keyframes bugFlash {
+            0%, 100% { background: #5c0000; box-shadow: none; }
+            50%       { background: #8a0000; box-shadow: 0 0 14px rgba(200,40,0,0.7); }
+        }
+
+        .btn-beta {
+            background: #1a1a0a;
+            border-color: var(--gold-dim, #8a6f2e);
+            color: var(--gold, #d4a017);
+        }
+        .btn-beta.disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* ── AutoPilot: Feedback Modal ───────────────────────────── */
+        .feedback-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(26,15,10,0.85);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .feedback-overlay.active { display: flex; }
+
+        .feedback-modal {
+            background: var(--parchment);
+            border: 3px double var(--sepia);
+            border-radius: 4px;
+            padding: 36px 40px;
+            max-width: 480px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        }
+        .feedback-modal-close {
+            position: absolute;
+            top: 12px; right: 16px;
+            background: none; border: none;
+            font-size: 1.6rem; cursor: pointer;
+            color: var(--sepia); line-height: 1;
+            padding: 0;
+        }
+        .feedback-modal-close:hover { color: var(--rust); }
+
+        .feedback-modal h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem;
+            color: var(--ink);
+            margin-bottom: 6px;
+        }
+        .feedback-modal .feedback-subtitle {
+            font-size: 0.82rem;
+            color: var(--sepia);
+            font-style: italic;
+            margin-bottom: 18px;
+        }
+
+        .feedback-type-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .feedback-type-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid var(--sepia);
+            border-radius: 4px;
+            background: var(--cream);
+            color: var(--ink);
+            font-family: 'Special Elite', monospace;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .feedback-type-btn.selected {
+            background: var(--sepia);
+            color: var(--parchment);
+        }
+
+        .feedback-textarea {
+            width: 100%;
+            min-height: 110px;
+            padding: 12px;
+            border: 2px solid var(--sepia);
+            border-radius: 4px;
+            background: var(--cream);
+            color: var(--ink);
+            font-family: 'Libre Baskerville', serif;
+            font-size: 0.9rem;
+            resize: vertical;
+            outline: none;
+            margin-bottom: 16px;
+        }
+        .feedback-textarea:focus { border-color: var(--rust); }
+        .feedback-textarea::placeholder { color: #9b7340; font-style: italic; }
+
+        .feedback-send-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--sepia);
+            color: var(--parchment);
+            border: none;
+            border-radius: 4px;
+            font-family: 'Special Elite', monospace;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .feedback-send-btn:hover { opacity: 0.85; }
+        .feedback-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── AutoPilot: Toast ────────────────────────────────────── */
+        .feedback-toast {
+            display: none;
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink);
+            color: var(--gold);
+            font-family: 'Special Elite', monospace;
+            font-size: 0.9rem;
+            padding: 14px 28px;
+            border-radius: 6px;
+            border: 1px solid var(--gold);
+            box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+            z-index: 11000;
+            white-space: nowrap;
+        }
+        .feedback-toast.show {
+            display: block;
+            animation: toastIn 0.3s ease forwards, toastOut 0.4s ease 2.8s forwards;
+        }
+        @keyframes toastIn  { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+        @keyframes toastOut { from { opacity:1; } to { opacity:0; } }
     </style>
 </head>
 <body>
@@ -1145,6 +1338,9 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                     </div>
                 </div>
 
+                <!-- AutoPilot: wrapper holds date machine + banners side-by-side -->
+                <div class="date-machine-wrapper">
+
                 <div class="date-machine" id="dateSection">
                     <h2 class="machine-title">⚙ Set Your Knowledge Cutoff Date ⚙</h2>
                     <p class="machine-desc">
@@ -1194,8 +1390,16 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                         <button class="era-btn" onclick="setEra(5, 1, 1692)">🧙 Salem Witch Trials</button>
                         <button class="era-btn" onclick="setEra(12, 7, 1941)">💥 Pearl Harbor</button>
                     </div>
+                </div><!-- /.date-machine -->
+
+                <!-- AutoPilot: side banners -->
+                <div class="feedback-banners">
+                    <button class="feedback-btn btn-report-bug" onclick="openFeedbackModal('bug')">🐛 Report Bug or Request Feature</button>
+                    <button class="feedback-btn btn-beta disabled" id="betaBtn" onclick="loadBetaVersion()" title="No beta version available yet">⚗ Use Beta Version</button>
                 </div>
-            </div>
+
+                </div><!-- /.date-machine-wrapper -->
+            </div><!-- /.main-layout -->
 
             <!-- Main content with sidebar (shown after activation) -->
             <div class="main-content" id="mainContent">
@@ -1259,12 +1463,31 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         </div>
     </div>
 
+    <!-- AutoPilot: Feedback Modal -->
+    <div class="feedback-overlay" id="feedbackOverlay">
+        <div class="feedback-modal">
+            <button class="feedback-modal-close" onclick="closeFeedbackModal()">&times;</button>
+            <h3>⚙ Dispatch a Report</h3>
+            <p class="feedback-subtitle">Your missive shall be received by the engineers of this apparatus.</p>
+            <div class="feedback-type-row">
+                <button class="feedback-type-btn selected" id="typeBug" onclick="selectFeedbackType('bug')">🐛 Bug Report</button>
+                <button class="feedback-type-btn" id="typeFeature" onclick="selectFeedbackType('feature')">✨ Feature Request</button>
+            </div>
+            <textarea class="feedback-textarea" id="feedbackText" placeholder="Describe what went wrong or what you'd like to see..."></textarea>
+            <button class="feedback-send-btn" id="feedbackSendBtn" onclick="submitFeedback()">⚙ Send Report ⚙</button>
+        </div>
+    </div>
+
+    <!-- AutoPilot: Toast notification -->
+    <div class="feedback-toast" id="feedbackToast"></div>
+
     <script>
         const API_BASE = 'https://us-central1-oldtimeyai-928be.cloudfunctions.net';
         const API_ENDPOINT = `${API_BASE}/chat`;
         const EVENTS_ENDPOINT = `${API_BASE}/events`;
         const STORY_ENDPOINT = `${API_BASE}/story`;
         const COUNTER_ENDPOINT = `${API_BASE}/counter`;
+        const FEEDBACK_ENDPOINT = `${API_BASE}/counter?action=feedback`;
         
         let cutoffDate = null;
         let conversationHistory = [];
@@ -1758,6 +1981,85 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             sendBtn.disabled = false;
             input.focus();
         }
+
+        // ── AutoPilot: Feedback functions ────────────────────────────────────
+
+        let _feedbackType = 'bug';
+
+        function openFeedbackModal(type) {
+            _feedbackType = type || 'bug';
+            selectFeedbackType(_feedbackType);
+            document.getElementById('feedbackText').value = '';
+            document.getElementById('feedbackSendBtn').disabled = false;
+            document.getElementById('feedbackSendBtn').textContent = '⚙ Send Report ⚙';
+            document.getElementById('feedbackOverlay').classList.add('active');
+            setTimeout(() => document.getElementById('feedbackText').focus(), 100);
+        }
+
+        function closeFeedbackModal() {
+            document.getElementById('feedbackOverlay').classList.remove('active');
+        }
+
+        function selectFeedbackType(type) {
+            _feedbackType = type;
+            document.getElementById('typeBug').classList.toggle('selected', type === 'bug');
+            document.getElementById('typeFeature').classList.toggle('selected', type === 'feature');
+        }
+
+        async function submitFeedback() {
+            const text = document.getElementById('feedbackText').value.trim();
+            if (!text) {
+                document.getElementById('feedbackText').focus();
+                return;
+            }
+            const btn = document.getElementById('feedbackSendBtn');
+            btn.disabled = true;
+            btn.textContent = 'Dispatching...';
+
+            try {
+                const payload = {
+                    text,
+                    type: _feedbackType,
+                    sessionDate: cutoffDate
+                        ? `${cutoffDate.month}/${cutoffDate.day}/${cutoffDate.year}`
+                        : null
+                };
+                const r = await fetch(FEEDBACK_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${r.status}`);
+                }
+                closeFeedbackModal();
+                showToast('✦ Your report has been received. Many thanks! ✦');
+            } catch (e) {
+                btn.disabled = false;
+                btn.textContent = '⚙ Send Report ⚙';
+                showToast(`⚠ Could not send report: ${e.message}`);
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('feedbackToast');
+            toast.textContent = msg;
+            toast.classList.remove('show');
+            void toast.offsetWidth; // reflow to restart animation
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        function loadBetaVersion() {
+            // Placeholder — will be wired up in Phase 2
+        }
+
+        // Close feedback modal on overlay click
+        document.getElementById('feedbackOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeFeedbackModal();
+        });
     </script>
 </body>
 </html>
+
