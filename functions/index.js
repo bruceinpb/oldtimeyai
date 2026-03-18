@@ -626,6 +626,14 @@ exports.counter = onRequest(
         });
         await db.collection("config").doc("analysisQueue").delete().catch(() => {});
 
+        // Mark all addressed reports as "reviewed" so counters reset to zero
+        const batch = db.batch();
+        triggerReports.forEach(r => {
+          batch.update(db.collection("feedbackReports").doc(r.id), { status: "reviewed" });
+        });
+        await batch.commit();
+        logger.info("Heartbeat: reports marked reviewed", { count: triggerReports.length });
+
         logger.info("Heartbeat: SUCCESS — beta published automatically", {
           type: triggerType, reportCount: triggerReports.length, htmlLength: html.length
         });
