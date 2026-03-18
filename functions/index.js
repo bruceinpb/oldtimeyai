@@ -1,4 +1,5 @@
 const { onRequest } = require("firebase-functions/https");
+const { onSchedule } = require("firebase-functions/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
@@ -721,6 +722,199 @@ Remember: The current date for you is ${formattedDate}. Anything after this date
     } catch (error) {
       logger.error("Function error", { message: error.message, stack: error.stack });
       return res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ── AutoPilot Heartbeat ──────────────────────────────────────────────────────
+// Runs every 5 minutes. Checks if any feedback type has crossed the threshold
+// and no beta is already queued/in-progress. If so, runs Claude analysis and
+// saves the result to config/betaVersion as pending_review for admin approval.
+exports.autopilotHeartbeat = onSchedule(
+  {
+    schedule: "every 5 minutes",
+    timeZone: "America/New_York",
+    secrets: [anthropicApiKey],
+    timeoutSeconds: 540,
+    memory: "512MiB"
+  },
+  async (event) => {
+    logger.info("AutoPilot heartbeat firing");
+
+    try {
+      // ── 1. Check if beta or queue already exists — skip if so ──────────────
+      const [betaDoc, queueDoc] = await Promise.all([
+        db.collection("config").doc("betaVersion").get(),
+        db.collection("config").doc("analysisQueue").get()
+      ]);
+
+      if (betaDoc.exists) {
+        const s = betaDoc.data().status;
+        if (s === "pending_review" || s === "published") {
+          logger.info("Heartbeat: beta already exists, skipping", { status: s });
+          return;
+        }
+      }
+      if (queueDoc.exists && queueDoc.data().status === "queued") {
+        logger.info("Heartbeat: queue already pending, clearing and proceeding");
+        // Clear stale queue so we own this run
+        await db.collection("config").doc("analysisQueue").delete();
+      }
+
+      // ── 2. Get threshold ───────────────────────────────────────────────────
+      const settingsDoc = await db.collection("config").doc("settings").get();
+      const threshold = settingsDoc.exists ? (settingsDoc.data().threshold || 5) : 5;
+
+      // ── 3. Count pending reports by type ──────────────────────────────────
+      const allPendingSnap = await db.collection("feedbackReports")
+        .where("status", "==", "pending")
+        .get();
+
+      const bugReports     = [];
+      const featureReports = [];
+      allPendingSnap.forEach(doc => {
+        const d = doc.data();
+        const report = {
+          id: doc.id,
+          text: d.text,
+          type: d.type,
+          timestamp: d.timestamp?.toDate?.()?.toISOString() || null
+        };
+        if (d.type === "bug")     bugReports.push(report);
+        if (d.type === "feature") featureReports.push(report);
+      });
+
+      logger.info("Heartbeat counts", {
+        bugs: bugReports.length,
+        features: featureReports.length,
+        threshold
+      });
+
+      // Bugs take priority if both cross threshold
+      let triggerReports = null;
+      let triggerType    = null;
+
+      if (bugReports.length >= threshold) {
+        triggerReports = bugReports;
+        triggerType    = "bug";
+      } else if (featureReports.length >= threshold) {
+        triggerReports = featureReports;
+        triggerType    = "feature";
+      }
+
+      if (!triggerReports) {
+        logger.info("Heartbeat: threshold not yet reached, nothing to do");
+        return;
+      }
+
+      // ── 4. Fetch current index.html ────────────────────────────────────────
+      logger.info("Heartbeat: threshold crossed, fetching index.html", {
+        type: triggerType,
+        count: triggerReports.length
+      });
+
+      const siteRes = await fetch(
+        "https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html"
+      );
+      if (!siteRes.ok) throw new Error(`Could not fetch index.html: ${siteRes.status}`);
+      const currentHtml = await siteRes.text();
+
+      // ── 5. Build prompt ────────────────────────────────────────────────────
+      const reportsText = triggerReports.map((r, i) =>
+        `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
+      ).join("\n");
+
+      const prompt = `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
+
+The AutoPilot heartbeat has detected that ${triggerReports.length} user ${triggerType} report(s) have crossed the action threshold. Your job is to:
+1. Read all the reports carefully
+2. Group similar/related reports together
+3. Diagnose the root cause(s)
+4. Implement ALL the fixes/features directly into the provided HTML
+5. Return the complete updated HTML file
+
+USER REPORTS (${triggerType}s):
+${reportsText}
+
+CURRENT index.html:
+${currentHtml}
+
+INSTRUCTIONS:
+- Implement every reasonable request. If multiple reports describe the same issue, fix it once.
+- Preserve ALL existing functionality — do not remove features.
+- Keep the steampunk/vintage aesthetic.
+- Your response must be in this EXACT format with no deviation:
+
+DIAGNOSIS:
+[2-5 sentences explaining what you found, grouped by theme, and what you changed]
+
+HTML:
+[The complete updated index.html file, starting with <!DOCTYPE html> and ending with </html>]`;
+
+      // ── 6. Call Claude ─────────────────────────────────────────────────────
+      logger.info("Heartbeat: calling Claude API", { type: triggerType, reports: triggerReports.length });
+
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicApiKey.value(),
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8192,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!claudeRes.ok) {
+        const errText = await claudeRes.text();
+        throw new Error(`Claude API ${claudeRes.status}: ${errText.substring(0, 200)}`);
+      }
+
+      const claudeData  = await claudeRes.json();
+      const fullResponse = claudeData.content[0].text;
+
+      // ── 7. Parse response ──────────────────────────────────────────────────
+      const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nHTML:)/i);
+      const htmlMatch = fullResponse.match(/HTML:\s*(<!DOCTYPE[\s\S]*<\/html>)/i);
+
+      if (!htmlMatch) {
+        logger.error("Heartbeat: Claude did not return valid HTML", {
+          responsePreview: fullResponse.substring(0, 500)
+        });
+        throw new Error("Claude did not return valid HTML in the expected format.");
+      }
+
+      const diagnosis = diagMatch ? diagMatch[1].trim() : "AutoPilot heartbeat fix.";
+      const html      = htmlMatch[1].trim();
+
+      // ── 8. Save as pending_review ──────────────────────────────────────────
+      await db.collection("config").doc("betaVersion").set({
+        html,
+        diagnosis,
+        type: triggerType,
+        reportCount: triggerReports.length,
+        status: "pending_review",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        promotedAt: null,
+        autoTriggered: true,
+        triggeredBy: "heartbeat"
+      });
+
+      // Clear any stale queue doc
+      await db.collection("config").doc("analysisQueue").delete().catch(() => {});
+
+      logger.info("Heartbeat: SUCCESS — beta saved as pending_review", {
+        type: triggerType,
+        reportCount: triggerReports.length,
+        htmlLength: html.length,
+        diagLength: diagnosis.length
+      });
+
+    } catch (err) {
+      logger.error("Heartbeat error", { message: err.message, stack: err.stack });
     }
   }
 );
