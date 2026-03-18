@@ -21,16 +21,18 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
           channelId: live
           projectId: oldtimeyai-928be
-      - name: Clean up stale autopilotHeartbeat function
+      - name: Remove stale autopilotHeartbeat via Cloud Run API
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
         run: |
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
-          # Delete the stale autopilotHeartbeat entry if it exists — ignore errors
-          npx firebase-tools@latest functions:delete autopilotHeartbeat \
-            --project oldtimeyai-928be --region us-central1 --force 2>/dev/null || true
-          echo "Cleanup complete (errors ignored)"
+          gcloud auth activate-service-account --key-file=/tmp/sa_key.json
+          gcloud config set project oldtimeyai-928be
+          # Delete the Cloud Run service directly — Firebase CLI can't block this
+          # Ignore errors in case it was already deleted
+          gcloud run services delete autopilotheartbeat \
+            --region=us-central1 --quiet 2>/dev/null || true
+          echo "Cloud Run service cleanup complete"
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
@@ -72,4 +74,4 @@ jobs:
               --description="OldTimeyAI AutoPilot heartbeat — checks feedback threshold every 5 min" \
               --quiet
           fi
-          echo "Scheduler job configured successfully."
+          echo "Scheduler job configured."
