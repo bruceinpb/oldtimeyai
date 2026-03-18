@@ -28,8 +28,6 @@ jobs:
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
           gcloud auth activate-service-account --key-file=/tmp/sa_key.json
           gcloud config set project oldtimeyai-928be
-          # Delete the Cloud Run service directly — Firebase CLI can't block this
-          # Ignore errors in case it was already deleted
           gcloud run services delete autopilotheartbeat \
             --region=us-central1 --quiet 2>/dev/null || true
           echo "Cloud Run service cleanup complete"
@@ -60,6 +58,7 @@ jobs:
               --message-body="{}" \
               --update-headers="Content-Type=application/json" \
               --time-zone="America/New_York" \
+              --attempt-deadline=540s \
               --quiet
           else
             echo "Creating scheduler job..."
@@ -69,9 +68,10 @@ jobs:
               --uri="${HEARTBEAT_URL}" \
               --http-method=POST \
               --message-body="{}" \
-              --update-headers="Content-Type=application/json" \
+              --headers="Content-Type=application/json" \
               --time-zone="America/New_York" \
+              --attempt-deadline=540s \
               --description="OldTimeyAI AutoPilot heartbeat — checks feedback threshold every 5 min" \
               --quiet
           fi
-          echo "Scheduler job configured."
+          echo "Scheduler job configured with 540s deadline."
