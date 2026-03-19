@@ -297,55 +297,6 @@
             overflow: hidden;
         }
 
-        .recipe-box .qa-content {
-            min-height: 280px;
-            max-height: 280px;
-            overflow: auto;
-            padding: 15px;
-        }
-
-        .recipe-content {
-            text-align: left;
-            font-family: 'Libre Baskerville', serif;
-            font-size: 0.8rem;
-            line-height: 1.5;
-            color: var(--ink);
-        }
-
-        .recipe-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1rem;
-            color: var(--sepia);
-            margin-bottom: 8px;
-            text-align: center;
-        }
-
-        .recipe-description {
-            font-style: italic;
-            margin-bottom: 12px;
-            text-align: center;
-            color: var(--sepia);
-            font-size: 0.75rem;
-        }
-
-        .recipe-ingredients, .recipe-method {
-            margin-bottom: 10px;
-        }
-
-        .recipe-ingredients ul {
-            margin: 5px 0 0 15px;
-            padding: 0;
-        }
-
-        .recipe-ingredients li {
-            margin: 2px 0;
-            font-size: 0.75rem;
-        }
-
-        .recipe-method {
-            font-size: 0.75rem;
-            line-height: 1.4;
-        }
 
         .qa-text {
             font-family: 'Libre Baskerville', serif;
@@ -1396,32 +1347,6 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                         </div>
                     </div>
 
-                    <div class="qa-box recipe-box">
-                        <div class="qa-header">
-                            🍲 Popular Recipe from <span class="year" id="recipeYear">1665</span>
-                        </div>
-                        <div class="qa-content">
-                            <div class="recipe-content" id="recipeContent">
-                                <h4 class="recipe-title">Pottage of Barley</h4>
-                                <p class="recipe-description">A hearty porridge favored by both peasant and nobleman alike.</p>
-                                <div class="recipe-ingredients">
-                                    <strong>Ingredients:</strong>
-                                    <ul>
-                                        <li>Pearl barley, one cup</li>
-                                        <li>Beef or mutton bones</li>
-                                        <li>Onions and leeks</li>
-                                        <li>Salt and herbs</li>
-                                    </ul>
-                                </div>
-                                <div class="recipe-method">
-                                    <strong>Method:</strong> Boil barley with bones for three hours. Add vegetables and seasonings. Serve hot in wooden bowls.
-                                </div>
-                            </div>
-                        </div>
-                        <div class="qa-footer">
-                            ✦ FLAVORS OF THE ERA ✦
-                        </div>
-                    </div>
                 </div>
 
                 <!-- AutoPilot: wrapper holds date machine + banners side-by-side -->
@@ -1580,118 +1505,6 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         let currentEvents = [];
         let qaIndex = 0;
 
-        // Historical Recipes by Era
-        const historicalRecipes = [
-            { 
-                year: 1200, 
-                title: "Frumenty", 
-                description: "A festive pudding made with wheat and milk, favored at medieval feasts.",
-                ingredients: ["Cracked wheat, soaked overnight", "Fresh milk from the cow", "Eggs from the henhouse", "Honey for sweetening", "Cinnamon bark if available"],
-                method: "Boil the wheat in milk until thick as porridge. Beat in eggs and honey. Dust with cinnamon. Serve warm in trencher bowls."
-            },
-            {
-                year: 1400,
-                title: "Pease Porridge", 
-                description: "A filling stew of dried peas, eaten both hot and cold by all classes.",
-                ingredients: ["Dried peas, well cleaned", "Salt pork or bacon bones", "Onions and garlic", "Fresh herbs from the garden", "Coarse salt to taste"],
-                method: "Soak peas overnight. Boil with bones until tender. Add herbs and seasonings. Eat hot or let cool and slice when thick."
-            },
-            {
-                year: 1500,
-                title: "Manchet Bread", 
-                description: "Fine white bread reserved for the wealthy, made from the best wheat flour.",
-                ingredients: ["Finest wheat flour, well sifted", "Fresh ale yeast", "Warm milk", "Butter or lard", "Salt and sugar"],
-                method: "Mix flour with warm milk and yeast. Knead with butter until smooth. Let rise near the fire. Bake in a hot oven until golden."
-            },
-            {
-                year: 1600,
-                title: "Syllabub", 
-                description: "A fashionable dessert of cream and wine, popular at elegant suppers.",
-                ingredients: ["Fresh cream from Jersey cows", "White wine or sherry", "Sugar loaf, grated fine", "Lemon juice freshly squeezed", "Nutmeg for sprinkling"],
-                method: "Whisk cream with wine until thick. Sweeten with sugar and lemon. Spoon into glasses and dust with nutmeg. Serve immediately."
-            },
-            {
-                year: 1650,
-                title: "Pottage of Barley", 
-                description: "A hearty porridge favored by both peasant and nobleman alike.",
-                ingredients: ["Pearl barley, one cup", "Beef or mutton bones", "Onions and leeks", "Salt and herbs", "Root vegetables if available"],
-                method: "Boil barley with bones for three hours. Add vegetables and seasonings. Stir frequently. Serve hot in wooden bowls."
-            },
-            {
-                year: 1700,
-                title: "Queen Cakes", 
-                description: "Delicate individual cakes baked in small tins, perfect for tea time.",
-                ingredients: ["Finest butter, well creamed", "Caster sugar", "Fresh eggs", "Self-raising flour", "Currants and candied peel"],
-                method: "Cream butter and sugar. Beat in eggs one at a time. Fold in flour and fruit. Bake in small tins until golden and risen."
-            },
-            {
-                year: 1750,
-                title: "Hannah Glasse's Beef Stew", 
-                description: "A robust stew from the famous cookbook, beloved by colonial households.",
-                ingredients: ["Beef chuck, cut in pieces", "Onions and carrots", "Ale or porter", "Bay leaves and thyme", "Flour for thickening"],
-                method: "Brown beef in a heavy pot. Add vegetables and herbs. Cover with ale and simmer gently for two hours until tender."
-            },
-            {
-                year: 1800,
-                title: "Shrewsbury Cakes", 
-                description: "Crisp biscuits flavored with caraway, popular throughout the Georgian era.",
-                ingredients: ["Fine flour", "Fresh butter", "Caster sugar", "Caraway seeds", "Rose water for flavoring"],
-                method: "Rub butter into flour. Add sugar and caraway. Bind with rose water. Roll thin and cut into rounds. Bake until pale golden."
-            },
-            {
-                year: 1850,
-                title: "Mrs. Beeton's Jam Tarts", 
-                description: "Simple pastry tarts filled with preserves, a nursery favorite.",
-                ingredients: ["Short pastry made with lard", "Strawberry or raspberry jam", "Fresh butter for the tins", "A pinch of salt", "Cold water to bind"],
-                method: "Line small tart tins with pastry. Fill with a spoonful of jam. Bake in a moderate oven until pastry is golden brown."
-            },
-            {
-                year: 1900,
-                title: "Victoria Sponge Cake", 
-                description: "A light sponge cake named after our beloved Queen, perfect for afternoon tea.",
-                ingredients: ["Equal weights butter and sugar", "The same in flour and eggs", "Strawberry jam for filling", "Fresh cream if desired", "Vanilla essence"],
-                method: "Cream butter and sugar until light. Beat in eggs gradually. Fold in flour carefully. Bake in two tins. Fill with jam and cream."
-            }
-        ];
-
-        // Recipe management
-        let currentRecipeIndex = 0;
-
-        function getRecipeForYear(year) {
-            // Find the most appropriate recipe for the given year
-            let bestRecipe = historicalRecipes[0];
-            let smallestDifference = Math.abs(year - bestRecipe.year);
-            
-            for (const recipe of historicalRecipes) {
-                const difference = Math.abs(year - recipe.year);
-                if (difference < smallestDifference && recipe.year <= year) {
-                    bestRecipe = recipe;
-                    smallestDifference = difference;
-                }
-            }
-            
-            return bestRecipe;
-        }
-
-        function updateRecipeBox(year) {
-            const recipe = getRecipeForYear(year || 1665);
-            
-            document.getElementById('recipeYear').textContent = year || recipe.year;
-            
-            const ingredientsList = recipe.ingredients.map(ing => `<li>${ing}</li>`).join('');
-            
-            document.getElementById('recipeContent').innerHTML = `
-                <h4 class="recipe-title">${recipe.title}</h4>
-                <p class="recipe-description">${recipe.description}</p>
-                <div class="recipe-ingredients">
-                    <strong>Ingredients:</strong>
-                    <ul>${ingredientsList}</ul>
-                </div>
-                <div class="recipe-method">
-                    <strong>Method:</strong> ${recipe.method}
-                </div>
-            `;
-        }
 
         // 100 Funny Historical Q&As
         const historicalQA = [
@@ -1872,9 +1685,6 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             document.getElementById('answerYear').textContent = qa.year;
             document.getElementById('questionText').textContent = `"${qa.question}"`;
             document.getElementById('answerText').textContent = qa.answer;
-            
-            // Update recipe box with same year
-            updateRecipeBox(qa.year);
             
             // Reset animations
             const questionText = document.getElementById('questionText');
