@@ -307,6 +307,11 @@ exports.counter = onRequest(
         const doc = await db.collection("config").doc("betaVersion").get();
         if (!doc.exists) return res.json({ exists: false });
         const d = doc.data();
+        // Also fetch client modal settings so poller can pass them to the countdown modal
+        const settingsSnap = await db.collection("config").doc("settings").get();
+        const clientModalSeconds     = settingsSnap.exists ? (settingsSnap.data().clientModalSeconds     || 30) : 30;
+        const bugReportWindowMinutes = settingsSnap.exists ? (settingsSnap.data().bugReportWindowMinutes || 5)  : 5;
+
         return res.json({
           exists: true,
           html: d.html,
@@ -318,6 +323,8 @@ exports.counter = onRequest(
           patchLayers: d.patchLayers || null,
           betaChain: d.betaChain || [],
           autoTriggered: d.autoTriggered || false,
+          clientModalSeconds,
+          bugReportWindowMinutes,
           createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
           updatedAt: d.updatedAt?.toDate?.()?.toISOString() || null,
           promotedAt: d.promotedAt?.toDate?.()?.toISOString() || null,
@@ -565,16 +572,169 @@ exports.counter = onRequest(
       }
     }
 
+    // ── Bug Review: POST /counter?action=flagBugReport ──────────────────────────
+    // Called when a user reports a bug during the auto-update window.
+    // Saves a critical feedback report and creates a 12-hour admin review queue entry.
+    if (req.method === "POST" && req.query.action === "flagBugReport") {
+      try {
+        const { text, betaCreatedAt, clientModalSeconds, bugReportWindowMinutes } = req.body || {};
+        if (!text || typeof text !== "string" || text.trim().length < 3) {
+          return res.status(400).json({ error: "Bug report text is required." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
+
+        // Save as a critical feedback report
+        const reportRef = await db.collection("feedbackReports").add({
+          text: text.trim().substring(0, 2000),
+          type: "bug",
+          criticalFlag: true,          // flagged as critical — came through update modal
+          betaCreatedAt: betaCreatedAt || null,
+          clientModalSeconds: clientModalSeconds || 30,
+          bugReportWindowMinutes: bugReportWindowMinutes || 5,
+          ip,
+          userAgent: req.headers["user-agent"] || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          status: "pending"
+        });
+
+        // Get current beta for review queue
+        const betaDoc = await db.collection("config").doc("betaVersion").get();
+
+        // Write/update bug review queue — 12h review window
+        const reviewDeadline = new Date(Date.now() + 12 * 60 * 60 * 1000);
+        const existingQueue = await db.collection("config").doc("bugReviewQueue").get();
+        if (existingQueue.exists && existingQueue.data().status === "pending_review") {
+          // Add to existing queue
+          const existing = existingQueue.data().reportIds || [];
+          await db.collection("config").doc("bugReviewQueue").update({
+            reportIds: [...existing, reportRef.id],
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } else {
+          // Create new review queue entry
+          await db.collection("config").doc("bugReviewQueue").set({
+            reportIds: [reportRef.id],
+            betaCreatedAt: betaCreatedAt || null,
+            betaPatchLayers: betaDoc.exists ? (betaDoc.data().patchLayers || 1) : null,
+            flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewDeadline: admin.firestore.Timestamp.fromDate(reviewDeadline),
+            status: "pending_review",   // pending_review | approved | rolled_back
+            clientModalSeconds: clientModalSeconds || 30,
+            bugReportWindowMinutes: bugReportWindowMinutes || 5
+          });
+        }
+
+        logger.info("Critical bug report flagged", { reportId: reportRef.id, ip });
+        return res.json({ ok: true, reviewDeadline: reviewDeadline.toISOString() });
+      } catch (error) {
+        logger.error("flagBugReport error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Bug Review: GET /counter?action=getBugReviewQueue ────────────────────
+    if (req.method === "GET" && req.query.action === "getBugReviewQueue") {
+      try {
+        const doc = await db.collection("config").doc("bugReviewQueue").get();
+        if (!doc.exists) return res.json({ exists: false });
+        const d = doc.data();
+        return res.json({
+          exists: true,
+          reportIds: d.reportIds || [],
+          betaCreatedAt: d.betaCreatedAt || null,
+          betaPatchLayers: d.betaPatchLayers || null,
+          flaggedAt: d.flaggedAt?.toDate?.()?.toISOString() || null,
+          reviewDeadline: d.reviewDeadline?.toDate?.()?.toISOString() || null,
+          status: d.status,
+          clientModalSeconds: d.clientModalSeconds || 30,
+          bugReportWindowMinutes: d.bugReportWindowMinutes || 5
+        });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── Bug Review: POST /counter?action=resolveBugReview ────────────────────
+    // Admin resolves the review: approve (keep beta) or rollback (revert to previous stable)
+    if (req.method === "POST" && req.query.action === "resolveBugReview") {
+      try {
+        const { action } = req.body || {};  // "approve" | "rollback"
+        if (!["approve", "rollback"].includes(action)) {
+          return res.status(400).json({ error: "action must be 'approve' or 'rollback'" });
+        }
+
+        if (action === "rollback") {
+          // Push previous stable HTML back to GitHub
+          const secretsDoc = await db.collection("config").doc("secrets").get();
+          const pat = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+          if (!pat) return res.status(500).json({ error: "GitHub PAT not configured." });
+
+          const stableDoc = await db.collection("config").doc("stableVersion").get();
+          if (!stableDoc.exists) return res.status(404).json({ error: "No previous stable version found." });
+          const stableHtml = stableDoc.data().html;
+          if (!stableHtml || stableHtml.length < 10000) {
+            return res.status(400).json({ error: "Previous stable HTML is invalid." });
+          }
+
+          const shaRes = await fetch(
+            "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+            { headers: { "Authorization": `token ${pat}`, "User-Agent": "OldTimeyAI-AutoPilot" } }
+          );
+          if (!shaRes.ok) throw new Error(`GitHub SHA fetch failed: ${shaRes.status}`);
+          const shaData = await shaRes.json();
+
+          const pushRes = await fetch(
+            "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+            {
+              method: "PUT",
+              headers: { "Authorization": `token ${pat}`, "Content-Type": "application/json", "User-Agent": "OldTimeyAI-AutoPilot" },
+              body: JSON.stringify({
+                message: "rollback: Admin rolled back due to critical bug report",
+                content: Buffer.from(stableHtml).toString("base64"),
+                sha: shaData.sha
+              })
+            }
+          );
+          if (!pushRes.ok) throw new Error(`GitHub push failed: ${pushRes.status}`);
+
+          // Clear beta and review queue
+          await db.collection("config").doc("betaVersion").delete().catch(() => {});
+          await db.collection("config").doc("bugReviewQueue").update({
+            status: "rolled_back",
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          logger.info("Rollback pushed to GitHub by admin");
+          return res.json({ ok: true, action: "rollback", message: "Previous stable version pushed to GitHub." });
+        }
+
+        // approve — just close the review queue, beta will auto-promote normally
+        await db.collection("config").doc("bugReviewQueue").update({
+          status: "approved",
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        logger.info("Bug review approved by admin");
+        return res.json({ ok: true, action: "approve" });
+
+      } catch (error) {
+        logger.error("resolveBugReview error", { message: error.message });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
     // ── Settings: GET /counter?action=getSettings ─────────────────────────────
     if (req.method === "GET" && req.query.action === "getSettings") {
       try {
         const doc = await db.collection("config").doc("settings").get();
-        const threshold           = doc.exists ? (doc.data().threshold           || 5)    : 5;
-        const heartbeatInterval   = doc.exists ? (doc.data().heartbeatInterval   || 5)    : 5;
-        const rateLimit           = doc.exists ? (doc.data().rateLimit           || 3)    : 3;
-        const autoPromoteMinutes  = doc.exists ? (doc.data().autoPromoteMinutes  || 1440) : 1440;
-        const lastHeartbeatAt     = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
-        return res.json({ threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, lastHeartbeatAt });
+        const threshold                = doc.exists ? (doc.data().threshold                || 5)    : 5;
+        const heartbeatInterval        = doc.exists ? (doc.data().heartbeatInterval        || 5)    : 5;
+        const rateLimit                = doc.exists ? (doc.data().rateLimit                || 3)    : 3;
+        const autoPromoteMinutes       = doc.exists ? (doc.data().autoPromoteMinutes       || 1440) : 1440;
+        const clientModalSeconds       = doc.exists ? (doc.data().clientModalSeconds       || 30)   : 30;
+        const bugReportWindowMinutes   = doc.exists ? (doc.data().bugReportWindowMinutes   || 5)    : 5;
+        const lastHeartbeatAt          = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
+        return res.json({ threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, clientModalSeconds, bugReportWindowMinutes, lastHeartbeatAt });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -583,7 +743,7 @@ exports.counter = onRequest(
     // ── Settings: POST /counter?action=saveSettings ───────────────────────────
     if (req.method === "POST" && req.query.action === "saveSettings") {
       try {
-        const { threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, resetHeartbeat } = req.body || {};
+        const { threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, clientModalSeconds, bugReportWindowMinutes, resetHeartbeat } = req.body || {};
         const updates = {};
         if (threshold !== undefined) {
           const val = parseInt(threshold);
@@ -605,6 +765,16 @@ exports.counter = onRequest(
           const val = parseInt(autoPromoteMinutes);
           if (isNaN(val) || val < 5 || val > 43200) return res.status(400).json({ error: "Auto-promote must be 5–43200 minutes." });
           updates.autoPromoteMinutes = val;
+        }
+        if (clientModalSeconds !== undefined) {
+          const val = parseInt(clientModalSeconds);
+          if (isNaN(val) || val < 5 || val > 300) return res.status(400).json({ error: "Client modal countdown must be 5–300 seconds." });
+          updates.clientModalSeconds = val;
+        }
+        if (bugReportWindowMinutes !== undefined) {
+          const val = parseInt(bugReportWindowMinutes);
+          if (isNaN(val) || val < 1 || val > 60) return res.status(400).json({ error: "Bug report window must be 1–60 minutes." });
+          updates.bugReportWindowMinutes = val;
         }
         if (resetHeartbeat === true) {
           // Write epoch-0 so the next scheduler tick runs immediately (not delayed)
@@ -726,6 +896,29 @@ exports.counter = onRequest(
                 logger.error("Heartbeat auto-promote failed", { message: promoteErr.message });
               }
               // Continue to check for new reports even after promoting
+            }
+          }
+        }
+
+        // ── 2b. Check bug review queue — if 12h passed with no admin action → auto-promote ──
+        const bugReviewDoc = await db.collection("config").doc("bugReviewQueue").get();
+        if (bugReviewDoc.exists && bugReviewDoc.data().status === "pending_review") {
+          const reviewDeadline = bugReviewDoc.data().reviewDeadline?.toDate?.();
+          if (reviewDeadline && Date.now() >= reviewDeadline.getTime()) {
+            logger.info("Heartbeat: bug review 12h window expired — auto-approving");
+            await db.collection("config").doc("bugReviewQueue").update({
+              status: "approved",
+              resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+              autoApproved: true
+            });
+            // Also trigger auto-promote of the current beta if it hasn't been promoted yet
+            const currentBeta = await db.collection("config").doc("betaVersion").get();
+            if (currentBeta.exists && currentBeta.data().status === "published") {
+              logger.info("Heartbeat: triggering auto-promote after review expiry");
+              // Force the createdAt to be old enough to trigger normal auto-promote on next check
+              await db.collection("config").doc("betaVersion").update({
+                createdAt: admin.firestore.Timestamp.fromDate(new Date(0))
+              });
             }
           }
         }
