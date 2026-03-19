@@ -1399,23 +1399,23 @@
 
             <div class="gallery">
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop" alt="Ancient ruins">
+                    <img src="https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop" alt="Ancient ruins" onerror="this.onerror=null;this.src='https://picsum.photos/seed/ruins42/400/500'">
                     <div class="card-label">Ancient World</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop" alt="Medieval">
+                    <img src="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop" alt="Medieval" onerror="this.onerror=null;this.src='https://picsum.photos/seed/castle42/400/500'">
                     <div class="card-label">Medieval Era</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop" alt="Victorian">
+                    <img src="https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop" alt="Victorian" onerror="this.onerror=null;this.src='https://picsum.photos/seed/victorian42/400/500'">
                     <div class="card-label">Victorian Age</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1520637836862-4d197d17c5a4?w=400&h=500&fit=crop" alt="Medieval Castle">
+                    <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=500&fit=crop" alt="Medieval Castle" onerror="this.onerror=null;this.src='https://picsum.photos/seed/castle42/400/500'">
                     <div class="card-label">Medieval Castle</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop" alt="Picasso Painting">
+                    <img src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop" alt="Picasso Painting" onerror="this.onerror=null;this.src='https://picsum.photos/seed/art42/400/500'">
                     <div class="card-label">Picasso</div>
                 </div>
             </div>
@@ -1607,7 +1607,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
     <!-- AutoPilot: Feedback Modal -->
     <!-- ── Incoming Update Modal ──────────────────────────────────── -->
     <div id="updateOverlay" onclick="updateOverlayClick(event)">
-      <div id="updateModal">
+      <div id="updateModal" onclick="updateOverlayClick(event)">
         <span class="upd-icon">⚙</span>
         <div class="upd-title">⚠ New Version Incoming</div>
         <div class="upd-countdown" id="updateCountdown">30</div>
@@ -2383,7 +2383,7 @@ let _lastKnownBetaCreatedAt = null;
                 overlay.id = 'updateOverlay';
                 overlay.setAttribute('onclick', 'updateOverlayClick(event)');
                 overlay.innerHTML = [
-                  '<div id="updateModal">',
+                  '<div id="updateModal" onclick="updateOverlayClick(event)">',
                   '<span class="upd-icon">⚙</span>',
                   '<div class="upd-title">⚠ New Version Incoming</div>',
                   '<div class="upd-countdown" id="updateCountdown">30</div>',
@@ -2446,12 +2446,16 @@ let _lastKnownBetaCreatedAt = null;
         }
 
         function updateOverlayClick(event) {
-            // Clicking the OVERLAY (not the modal itself) dismisses the display
-            // but the _updateTimer still fires — update WILL happen
-            if (event.target === document.getElementById('updateOverlay')) {
-                document.getElementById('updateOverlay').classList.remove('active');
-                // Timer keeps running invisibly
-            }
+            // Clicking the overlay background OR the modal box dismisses the display.
+            // The bug report button/form have stopPropagation so they won't trigger this.
+            // The mandatory _updateTimer keeps running invisibly regardless.
+            const overlay = document.getElementById('updateOverlay');
+            const modal   = document.getElementById('updateModal');
+            const bugForm = document.getElementById('updateBugForm');
+            // Don't dismiss if clicking inside the bug report form
+            if (bugForm && bugForm.contains(event.target) && bugForm.style.display !== 'none') return;
+            if (overlay) overlay.classList.remove('active');
+            // Timer keeps running invisibly
         }
 
         function showUpdateBugForm(event) {
