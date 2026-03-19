@@ -364,6 +364,7 @@ exports.counter = onRequest(
           reportCount: reportCount || 0,
           status: "published",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           promotedAt: null
         });
         logger.info("Beta version published", { type, reportCount, markedCount });
