@@ -1,3 +1,4 @@
+// Deployed: 2026-03-19T03:15:39Z
 const { onRequest } = require("firebase-functions/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
