@@ -730,6 +730,13 @@
     }
 
     const promoteAt = new Date(betaCreatedAt).getTime() + (autoPromoteMinutes * 60 * 1000);
+
+    // Guard: if deadline is already past, hide the card entirely — promotion already happened
+    if (promoteAt <= Date.now()) {
+      card.style.display = "none";
+      return;
+    }
+
     card.style.display = "flex";
     card.style.flexDirection = "column";
 
@@ -738,10 +745,11 @@
       if (remaining <= 0) {
         display.textContent = "Now!";
         display.style.color = "var(--green)";
+        display.style.animation = "";
         sub.textContent = "auto-promote firing…";
         clearInterval(_countdownInterval);
-        // Refresh beta state after a moment
-        setTimeout(syncBetaState, 3000);
+        // Refresh beta state after 5s to pick up promoted status, then hide
+        setTimeout(() => { syncBetaState(); stopCountdown(); }, 5000);
         return;
       }
 
@@ -1048,7 +1056,7 @@
           ago < 1 ? "Last run: just now" : `Last run: ${ago}m ago`;
       }
 
-      _betaIsLive = data.exists && (data.status === "published" || data.status === "promoted");
+      _betaIsLive = data.exists && data.status === "published";  // "promoted" means already done — not live
       const isPendingReview = data.exists && data.status === "pending_review";
 
       document.getElementById("betaLiveBadge").style.display = _betaIsLive ? "inline-flex" : "none";
