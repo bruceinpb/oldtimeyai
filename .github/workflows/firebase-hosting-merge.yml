@@ -39,15 +39,18 @@ jobs:
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
           gcloud auth activate-service-account --key-file=/tmp/sa_key.json
           gcloud config set project oldtimeyai-928be
-          if [ -z "${GITHUB_PAT_FOR_PROMOTE}" ]; then
-            echo "GITHUB_PAT_FOR_PROMOTE secret not set — skipping"
-          else
-            # Create secret if it doesn't exist, then add a new version
-            gcloud secrets describe GITHUB_PAT --project=oldtimeyai-928be --quiet 2>/dev/null || \
-              gcloud secrets create GITHUB_PAT --replication-policy=automatic --project=oldtimeyai-928be
+          # Ensure secret exists (Firebase deploy will fail if defineSecret() references a missing secret)
+          gcloud secrets describe GITHUB_PAT --project=oldtimeyai-928be --quiet 2>/dev/null || \
+            (echo "Creating GITHUB_PAT secret..." && \
+             echo -n "placeholder-add-real-value-via-github-secret" | \
+             gcloud secrets create GITHUB_PAT --data-file=- --replication-policy=automatic --project=oldtimeyai-928be)
+          # If the real PAT is available from GitHub secret, write it as the latest version
+          if [ -n "${GITHUB_PAT_FOR_PROMOTE}" ]; then
             echo -n "${GITHUB_PAT_FOR_PROMOTE}" | \
               gcloud secrets versions add GITHUB_PAT --data-file=- --project=oldtimeyai-928be
-            echo "GITHUB_PAT secret synced to Firebase Secret Manager"
+            echo "GITHUB_PAT synced from GitHub secret → Firebase Secret Manager"
+          else
+            echo "GITHUB_PAT_FOR_PROMOTE not set — secret exists but uses placeholder. Add it in GitHub → Settings → Secrets → Actions."
           fi
       - name: Deploy Cloud Functions
         env:
