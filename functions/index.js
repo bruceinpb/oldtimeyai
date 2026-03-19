@@ -8,7 +8,6 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
-const githubPat       = defineSecret("GITHUB_PAT");
 
 
 // ── AutoPilot: shared prompt builder and patch applier ────────────────────────
@@ -91,7 +90,7 @@ exports.counter = onRequest(
     invoker: "public",
     timeoutSeconds: 540,
     memory: "512MiB",
-    secrets: [anthropicApiKey, githubPat]
+    secrets: [anthropicApiKey]
   },
   async (req, res) => {
 
@@ -371,8 +370,10 @@ exports.counter = onRequest(
           return res.status(400).json({ error: "Beta HTML is empty or invalid." });
         }
 
-        const pat = githubPat.value();
-        if (!pat) return res.status(500).json({ error: "GITHUB_PAT secret not configured." });
+        // Read PAT from Firestore config/secrets (server-side only, never exposed to clients)
+        const secretsDoc = await db.collection("config").doc("secrets").get();
+        const pat = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+        if (!pat) return res.status(500).json({ error: "GitHub PAT not configured. Add it via the admin panel Settings tab." });
 
         // Step 1: Get current SHA of index.html in GitHub (required for update API)
         const shaRes = await fetch(
@@ -509,6 +510,39 @@ exports.counter = onRequest(
 
       } catch (error) {
         logger.error("analyze error", { message: error.message, stack: error.stack });
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── PAT: POST /counter?action=saveGithubPat ──────────────────────────────
+    // Stores the GitHub PAT in Firestore config/secrets (server-side only).
+    // Never exposed to clients — Firestore rules block public reads of config/.
+    if (req.method === "POST" && req.query.action === "saveGithubPat") {
+      try {
+        const { pat } = req.body || {};
+        if (!pat || typeof pat !== "string" || !pat.startsWith("github_")) {
+          return res.status(400).json({ error: "Invalid PAT — must start with 'github_'." });
+        }
+        await db.collection("config").doc("secrets").set(
+          { githubPat: pat, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+          { merge: true }
+        );
+        logger.info("GitHub PAT saved to Firestore config/secrets");
+        return res.json({ ok: true, message: "PAT saved. Promote to Stable is now enabled." });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── PAT: GET /counter?action=checkGithubPat ──────────────────────────────
+    // Returns whether a PAT is configured (never returns the actual value).
+    if (req.method === "GET" && req.query.action === "checkGithubPat") {
+      try {
+        const doc = await db.collection("config").doc("secrets").get();
+        const configured = doc.exists && !!doc.data().githubPat;
+        const updatedAt = doc.exists ? doc.data().updatedAt?.toDate?.()?.toISOString() || null : null;
+        return res.json({ configured, updatedAt });
+      } catch (error) {
         return res.status(500).json({ error: error.message });
       }
     }
