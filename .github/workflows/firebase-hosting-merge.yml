@@ -31,31 +31,6 @@ jobs:
           gcloud run services delete autopilotheartbeat \
             --region=us-central1 --quiet 2>/dev/null || true
           echo "Cloud Run service cleanup complete"
-      - name: Sync GITHUB_PAT into Firebase Secret Manager
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
-          GITHUB_PAT_FOR_PROMOTE: ${{ secrets.GITHUB_PAT_FOR_PROMOTE }}
-        run: |
-          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
-          gcloud auth activate-service-account --key-file=/tmp/sa_key.json
-          gcloud config set project oldtimeyai-928be
-          # Ensure secret exists (Firebase deploy fails if defineSecret() references missing secret)
-          if gcloud secrets describe GITHUB_PAT --project=oldtimeyai-928be --quiet 2>/dev/null; then
-            echo "GITHUB_PAT secret exists"
-          else
-            echo "Creating GITHUB_PAT secret..."
-            echo -n "placeholder" | \
-              gcloud secrets create GITHUB_PAT --data-file=- --replication-policy=automatic --project=oldtimeyai-928be
-            echo "Created. NOTE: Grant Secret Accessor to 921852100580-compute@developer.gserviceaccount.com in GCP console."
-          fi
-          # Sync real PAT value if GitHub secret is configured
-          if [ -n "${GITHUB_PAT_FOR_PROMOTE}" ]; then
-            echo -n "${GITHUB_PAT_FOR_PROMOTE}" | \
-              gcloud secrets versions add GITHUB_PAT --data-file=- --project=oldtimeyai-928be
-            echo "GITHUB_PAT synced → Firebase Secret Manager"
-          else
-            echo "GITHUB_PAT_FOR_PROMOTE not set in GitHub secrets yet."
-          fi
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
