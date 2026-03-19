@@ -688,6 +688,12 @@ exports.counter = onRequest(
                   if (shaRes.ok) {
                     const shaData = await shaRes.json();
                     const betaHtml = betaDoc.data().html;
+                    // Safety guard: never auto-promote if HTML is suspiciously small
+                    if (!betaHtml || betaHtml.length < 10000) {
+                      logger.error("Heartbeat: auto-promote aborted — HTML too small", { length: betaHtml?.length });
+                      await db.collection("config").doc("betaVersion").delete();
+                      return res.json({ ok: true, message: "Auto-promote aborted: beta HTML invalid, cleared." });
+                    }
                     const pushRes = await fetch(
                       "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
                       {
@@ -808,7 +814,7 @@ exports.counter = onRequest(
           featureCount,
           reportCount: allReports.length,
           status: "published",
-          createdAt: freshBetaDoc.exists ? (freshBetaDoc.data().createdAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),  // always fresh — auto-promote timer starts from this batch
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           promotedAt: null,
           autoTriggered: true,
