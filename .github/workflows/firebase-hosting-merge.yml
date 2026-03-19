@@ -39,32 +39,22 @@ jobs:
           echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
           gcloud auth activate-service-account --key-file=/tmp/sa_key.json
           gcloud config set project oldtimeyai-928be
-          PROJECT_NUMBER=$(gcloud projects describe oldtimeyai-928be --format="value(projectNumber)")
-          COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-          # Ensure secret exists
+          # Ensure secret exists (Firebase deploy fails if defineSecret() references missing secret)
           if gcloud secrets describe GITHUB_PAT --project=oldtimeyai-928be --quiet 2>/dev/null; then
-            echo "GITHUB_PAT secret already exists"
+            echo "GITHUB_PAT secret exists"
           else
             echo "Creating GITHUB_PAT secret..."
-            echo -n "placeholder-add-real-value-via-github-secret" | \
+            echo -n "placeholder" | \
               gcloud secrets create GITHUB_PAT --data-file=- --replication-policy=automatic --project=oldtimeyai-928be
-            echo "Created GITHUB_PAT secret"
+            echo "Created. NOTE: Grant Secret Accessor to 921852100580-compute@developer.gserviceaccount.com in GCP console."
           fi
-          # Grant compute SA access so Cloud Function can read the secret
-          gcloud secrets add-iam-policy-binding GITHUB_PAT \
-            --project=oldtimeyai-928be \
-            --member="serviceAccount:${COMPUTE_SA}" \
-            --role="roles/secretmanager.secretAccessor" --quiet
-          echo "IAM binding set for ${COMPUTE_SA}"
-          # If the real PAT is available from GitHub secret, write it as the latest version
+          # Sync real PAT value if GitHub secret is configured
           if [ -n "${GITHUB_PAT_FOR_PROMOTE}" ]; then
             echo -n "${GITHUB_PAT_FOR_PROMOTE}" | \
               gcloud secrets versions add GITHUB_PAT --data-file=- --project=oldtimeyai-928be
-            echo "GITHUB_PAT synced from GitHub secret → Firebase Secret Manager"
+            echo "GITHUB_PAT synced → Firebase Secret Manager"
           else
-            echo "GITHUB_PAT_FOR_PROMOTE not set in GitHub secrets — Promote to Stable will use placeholder until you add it."
-            echo "Go to: github.com/bruceinpb/oldtimeyai → Settings → Secrets → Actions → New repository secret"
-            echo "Name: GITHUB_PAT_FOR_PROMOTE"
+            echo "GITHUB_PAT_FOR_PROMOTE not set in GitHub secrets yet."
           fi
       - name: Deploy Cloud Functions
         env:
