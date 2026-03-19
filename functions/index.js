@@ -288,7 +288,7 @@ exports.counter = onRequest(
     if (req.method === "POST" && req.query.action === "updateFeedbackStatus") {
       try {
         const { id, status } = req.body || {};
-        const validStatuses = ["pending", "reviewed", "implemented", "dismissed"];
+        const validStatuses = ["pending", "reviewed", "dismissed", "deployed"];
         if (!id || !validStatuses.includes(status)) {
           return res.status(400).json({ error: "Invalid id or status." });
         }
@@ -313,7 +313,13 @@ exports.counter = onRequest(
           diagnosis: d.diagnosis,
           type: d.type,
           reportCount: d.reportCount,
+          bugCount: d.bugCount || null,
+          featureCount: d.featureCount || null,
+          patchLayers: d.patchLayers || null,
+          betaChain: d.betaChain || [],
+          autoTriggered: d.autoTriggered || false,
           createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
+          updatedAt: d.updatedAt?.toDate?.()?.toISOString() || null,
           promotedAt: d.promotedAt?.toDate?.()?.toISOString() || null,
           status: d.status   // "pending_review" | "published" | "promoted" | "reverted"
         });
