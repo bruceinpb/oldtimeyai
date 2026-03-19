@@ -1415,7 +1415,7 @@
                     <div class="card-label">Medieval Castle</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1551632436-cbf8dd35adfa?w=400&h=500&fit=crop" alt="Chinese Dragon" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1518709594023-6eab2cd20f09?w=400&h=500&fit=crop'">
+                    <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop" alt="Chinese Dragon" onerror="this.onerror=null;this.src='https://picsum.photos/seed/dragon42/400/500'">
                     <div class="card-label">Chinese Dragon</div>
                 </div>
             </div>
@@ -2543,12 +2543,33 @@ let _lastKnownBetaCreatedAt = null;
                         betaBtn.title = 'Beta version available — click to switch back';
                     }
                 } else {
-                    // No beta available
+                    // No beta available (or promoted to stable)
                     betaBtn.classList.add('disabled');
                     betaBtn.classList.remove('beta-available', 'beta-seen');
                     betaBtn.textContent = '⚗ Use Beta Version';
                     betaBtn.title = 'No beta version available yet';
                     betaBtn.onclick = null;
+
+                    // If user was on a beta session and the beta just promoted to stable,
+                    // remove the "You are using Beta Version" banner — they ARE on stable now.
+                    const usingBeta = sessionStorage.getItem('using_beta') === 'true';
+                    const justPromoted = data.exists && data.status === 'promoted';
+                    if (usingBeta && (justPromoted || !data.exists)) {
+                        sessionStorage.removeItem('using_beta');
+                        sessionStorage.removeItem('beta_seen_at');
+                        const banner = document.getElementById('betaRevertBanner');
+                        if (banner) {
+                            // Fade out then remove
+                            banner.style.transition = 'opacity 1s';
+                            banner.style.opacity = '0';
+                            setTimeout(() => {
+                                banner.remove();
+                                // Also remove the spacer div below it
+                                const spacer = banner.nextElementSibling;
+                                if (spacer && spacer.style && spacer.style.height === '48px') spacer.remove();
+                            }, 1000);
+                        }
+                    }
                 }
             } catch(e) { /* silent */ }
         }
