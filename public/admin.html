@@ -615,6 +615,11 @@
     const saved = localStorage.getItem(THRESHOLD_KEY);
     const val = saved ? parseInt(saved) : 5;
     document.getElementById("thresholdInput").value = val;
+    // Apply cached values immediately while server loads (prevents flash of defaults)
+    const savedInterval = localStorage.getItem("autopilot_heartbeat_interval");
+    if (savedInterval) document.getElementById("heartbeatInput").value = savedInterval;
+    const savedRateLimit = localStorage.getItem("autopilot_rate_limit");
+    if (savedRateLimit) document.getElementById("rateLimitInput").value = savedRateLimit;
     // Pull settings from server — returns Promise so init can await it
     return fetch(`${BASE}/counter?action=getSettings`)
       .then(r => r.json())
@@ -647,12 +652,7 @@
       .catch(() => {
         document.getElementById("heartbeatHint").textContent = "Last run: unavailable";
       });
-    // Also set values from localStorage while Firestore loads
-    const savedInterval = localStorage.getItem("autopilot_heartbeat_interval");
-    if (savedInterval) document.getElementById("heartbeatInput").value = savedInterval;
-    const savedRateLimit = localStorage.getItem("autopilot_rate_limit");
-    if (savedRateLimit) document.getElementById("rateLimitInput").value = savedRateLimit;
-    return val;
+
   }
 
 
@@ -1066,7 +1066,7 @@
       const isPendingReview = data.exists && data.status === "pending_review";
 
       document.getElementById("betaLiveBadge").style.display = _betaIsLive ? "inline-flex" : "none";
-      document.getElementById("btnRevert").style.display  = data.exists  ? "inline-flex" : "none";
+      document.getElementById("btnRevert").style.display  = (data.exists && data.status === "published") ? "inline-flex" : "none";  // hide after auto-promote
       document.getElementById("btnPromote").style.display = _betaIsLive  ? "inline-flex" : "none";
       // Only hide Publish if there's no pending analysis — the poll must not clobber in-flight work
       if (!_pendingHtml) document.getElementById("btnPublish").style.display = "none";
