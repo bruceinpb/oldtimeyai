@@ -8,6 +8,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
+const githubPat       = defineSecret("GITHUB_PAT");
 
 
 // ── AutoPilot: shared prompt builder and patch applier ────────────────────────
@@ -89,7 +90,8 @@ exports.counter = onRequest(
     cors: true,
     invoker: "public",
     timeoutSeconds: 540,
-    memory: "512MiB"
+    memory: "512MiB",
+    secrets: [anthropicApiKey, githubPat]
   },
   async (req, res) => {
 
@@ -357,27 +359,77 @@ exports.counter = onRequest(
     }
 
     // ── Beta: POST /counter?action=promoteBeta ───────────────────────────────
-    // Promotes beta to stable: copies beta html into config/stableVersion
+    // Promotes beta to stable: pushes beta HTML to GitHub as public/index.html
+    // via the GitHub API, triggering the CI/CD deploy pipeline automatically.
     if (req.method === "POST" && req.query.action === "promoteBeta") {
       try {
         const betaDoc = await db.collection("config").doc("betaVersion").get();
         if (!betaDoc.exists) return res.status(404).json({ error: "No beta version exists." });
         const betaData = betaDoc.data();
-        // Save current beta as new stable
+        const betaHtml = betaData.html;
+        if (!betaHtml || betaHtml.length < 100) {
+          return res.status(400).json({ error: "Beta HTML is empty or invalid." });
+        }
+
+        const pat = githubPat.value();
+        if (!pat) return res.status(500).json({ error: "GITHUB_PAT secret not configured." });
+
+        // Step 1: Get current SHA of index.html in GitHub (required for update API)
+        const shaRes = await fetch(
+          "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+          { headers: { "Authorization": `token ${pat}`, "User-Agent": "OldTimeyAI-AutoPilot" } }
+        );
+        if (!shaRes.ok) throw new Error(`GitHub SHA fetch failed: ${shaRes.status}`);
+        const shaData = await shaRes.json();
+        const currentSha = shaData.sha;
+        if (!currentSha) throw new Error("Could not get current file SHA from GitHub.");
+
+        // Step 2: Push beta HTML as new stable index.html
+        const content = Buffer.from(betaHtml).toString("base64");
+        const pushRes = await fetch(
+          "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+          {
+            method: "PUT",
+            headers: {
+              "Authorization": `token ${pat}`,
+              "Content-Type": "application/json",
+              "User-Agent": "OldTimeyAI-AutoPilot"
+            },
+            body: JSON.stringify({
+              message: `promote: AutoPilot beta → stable (${betaData.type}, ${betaData.reportCount} reports)`,
+              content,
+              sha: currentSha
+            })
+          }
+        );
+        if (!pushRes.ok) {
+          const err = await pushRes.text();
+          throw new Error(`GitHub push failed: ${pushRes.status} — ${err.substring(0, 200)}`);
+        }
+        const pushData = await pushRes.json();
+        const commitSha = pushData.commit?.sha || "unknown";
+
+        // Step 3: Record promotion in Firestore
         await db.collection("config").doc("stableVersion").set({
-          html: betaData.html,
+          html: betaHtml,
           promotedFrom: "beta",
-          promotedAt: admin.firestore.FieldValue.serverTimestamp()
+          commitSha,
+          promotedAt: admin.firestore.FieldValue.serverTimestamp(),
+          type: betaData.type,
+          reportCount: betaData.reportCount,
+          diagnosis: betaData.diagnosis || ""
         });
-        // Mark beta as promoted
         await db.collection("config").doc("betaVersion").update({
           status: "promoted",
-          promotedAt: admin.firestore.FieldValue.serverTimestamp()
+          promotedAt: admin.firestore.FieldValue.serverTimestamp(),
+          commitSha
         });
-        logger.info("Beta promoted to stable");
-        return res.json({ ok: true });
+
+        logger.info("Beta promoted to stable via GitHub push", { commitSha, type: betaData.type });
+        return res.json({ ok: true, commitSha, message: "Beta pushed to GitHub — CI/CD deploying now." });
+
       } catch (error) {
-        logger.error("promoteBeta error", { message: error.message });
+        logger.error("promoteBeta error", { message: error.message, stack: error.stack });
         return res.status(500).json({ error: error.message });
       }
     }
