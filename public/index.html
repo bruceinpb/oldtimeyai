@@ -2550,25 +2550,17 @@ let _lastKnownBetaCreatedAt = null;
                     betaBtn.title = 'No beta version available yet';
                     betaBtn.onclick = null;
 
-                    // If user was on a beta session and the beta just promoted to stable,
-                    // remove the "You are using Beta Version" banner — they ARE on stable now.
-                    const usingBeta = sessionStorage.getItem('using_beta') === 'true';
-                    const justPromoted = data.exists && data.status === 'promoted';
-                    if (usingBeta && (justPromoted || !data.exists)) {
+                    // If user was on beta and it just got promoted to stable,
+                    // remove the beta banner — they are now on the stable version
+                    const banner = document.getElementById('betaRevertBanner');
+                    if (banner && (data.status === 'promoted' || !data.exists)) {
+                        banner.remove();
+                        // Remove the spacer div that follows the banner
+                        const spacer = banner.nextElementSibling;
+                        if (spacer && spacer.style.height === '48px') spacer.remove();
                         sessionStorage.removeItem('using_beta');
                         sessionStorage.removeItem('beta_seen_at');
-                        const banner = document.getElementById('betaRevertBanner');
-                        if (banner) {
-                            // Fade out then remove
-                            banner.style.transition = 'opacity 1s';
-                            banner.style.opacity = '0';
-                            setTimeout(() => {
-                                banner.remove();
-                                // Also remove the spacer div below it
-                                const spacer = banner.nextElementSibling;
-                                if (spacer && spacer.style && spacer.style.height === '48px') spacer.remove();
-                            }, 1000);
-                        }
+                        sessionStorage.removeItem('bug_report_window_end');
                     }
                 }
             } catch(e) { /* silent */ }
