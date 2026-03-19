@@ -526,6 +526,24 @@
     </div>
     <div class="threshold-hint">Beta auto-promotes to stable after this many minutes (1440 = 24h, 0 = manual only)</div>
   </div>
+  <div class="threshold-card">
+    <div class="label">📱 Client Modal</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="clientModalSecondsInput" min="5" max="300" value="30" style="width:64px" />
+      <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">sec</span>
+      <button class="btn-save-threshold" onclick="saveClientModal()">Save</button>
+    </div>
+    <div class="threshold-hint">Countdown before auto-update loads on client (5–300 sec)</div>
+  </div>
+  <div class="threshold-card">
+    <div class="label">🐛 Bug Report Window</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="bugReportWindowInput" min="1" max="60" value="5" style="width:64px" />
+      <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">min</span>
+      <button class="btn-save-threshold" onclick="saveBugReportWindow()">Save</button>
+    </div>
+    <div class="threshold-hint">How long users can report a critical bug after auto-update</div>
+  </div>
   <div class="threshold-card" id="countdownCard" style="min-width:200px;display:none">
     <div class="label">⏳ NEXT AUTO-PROMOTE</div>
     <div id="countdownDisplay" style="
@@ -579,6 +597,33 @@
     <div id="diagnosisWrap" style="display:none">
       <div class="diagnosis-label">🔍 Claude's Diagnosis &amp; Proposed Changes</div>
       <div class="diagnosis-box" id="diagnosisBox"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bug Review Queue Panel ──────────────────────────────────────── -->
+<div id="bugReviewPanel" style="display:none;margin:16px 24px 0;border:2px solid var(--red);border-radius:8px;overflow:hidden">
+  <div style="background:#1a0505;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--red)">
+    <div style="font-size:14px;font-weight:600;color:var(--red);display:flex;align-items:center;gap:8px">
+      🚨 Critical Bug Report — Admin Review Required
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="resolveBugReview('approve')" style="background:#0d2d17;border:1px solid var(--green);color:var(--green);padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">✓ Approve (Keep Beta)</button>
+      <button onclick="resolveBugReview('rollback')" style="background:#3d1a1a;border:1px solid var(--red);color:var(--red);padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">↩ Rollback to Previous Stable</button>
+    </div>
+  </div>
+  <div style="padding:16px 20px;background:var(--surface2)">
+    <div id="bugReviewStatus" style="font-size:13px;color:var(--text-dim);font-style:italic;margin-bottom:10px"></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)">Review Deadline</div>
+        <div id="bugReviewCountdown" style="font-size:22px;font-weight:700;color:var(--red);font-family:'Special Elite',monospace;margin-top:4px">--:--:--</div>
+        <div id="bugReviewDeadlineTime" style="font-size:11px;color:var(--text-dim);margin-top:2px"></div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:4px">Bug Reports Filed</div>
+        <div id="bugReviewReports" style="font-size:13px;color:var(--text)"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -639,6 +684,12 @@
         if (data.rateLimit) {
           document.getElementById("rateLimitInput").value = data.rateLimit;
           localStorage.setItem("autopilot_rate_limit", data.rateLimit);
+        }
+        if (data.clientModalSeconds) {
+          document.getElementById("clientModalSecondsInput").value = data.clientModalSeconds;
+        }
+        if (data.bugReportWindowMinutes) {
+          document.getElementById("bugReportWindowInput").value = data.bugReportWindowMinutes;
         }
         // Show last heartbeat time
         const hint = document.getElementById("heartbeatHint");
@@ -1336,16 +1387,115 @@
     }
   }
 
+  function saveClientModal() {
+    const val = parseInt(document.getElementById("clientModalSecondsInput").value);
+    if (isNaN(val) || val < 5 || val > 300) { alert("Client modal must be 5–300 seconds."); return; }
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientModalSeconds: val })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) alert("Failed: " + d.error);
+    }).catch(e => alert("Error: " + e.message));
+  }
+
+  function saveBugReportWindow() {
+    const val = parseInt(document.getElementById("bugReportWindowInput").value);
+    if (isNaN(val) || val < 1 || val > 60) { alert("Bug report window must be 1–60 minutes."); return; }
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bugReportWindowMinutes: val })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) alert("Failed: " + d.error);
+    }).catch(e => alert("Error: " + e.message));
+  }
+
+  // ── Bug Review Queue ──────────────────────────────────────────────────────
+  let _bugReviewInterval = null;
+
+  async function loadBugReviewQueue() {
+    try {
+      const r = await fetch(`${BASE}/counter?action=getBugReviewQueue`);
+      if (!r.ok) return;
+      const data = await r.json();
+      const panel = document.getElementById("bugReviewPanel");
+
+      if (!data.exists || data.status !== "pending_review") {
+        panel.style.display = "none";
+        if (_bugReviewInterval) { clearInterval(_bugReviewInterval); _bugReviewInterval = null; }
+        return;
+      }
+
+      panel.style.display = "block";
+
+      // Status text
+      const flaggedAt = data.flaggedAt ? new Date(data.flaggedAt).toLocaleString() : "unknown";
+      const count = (data.reportIds || []).length;
+      document.getElementById("bugReviewStatus").textContent =
+        `${count} critical bug report${count>1?"s":""} filed at ${flaggedAt}. ` +
+        `User had ${data.clientModalSeconds||30}s countdown and ${data.bugReportWindowMinutes||5}min to report.`;
+
+      // Report list
+      document.getElementById("bugReviewReports").textContent =
+        `${count} report ID${count>1?"s":""}: ${(data.reportIds||[]).join(", ")}`;
+
+      // Countdown
+      const deadlineMs = data.reviewDeadline ? new Date(data.reviewDeadline).getTime() : null;
+      if (deadlineMs) {
+        const deadlineDate = new Date(deadlineMs);
+        document.getElementById("bugReviewDeadlineTime").textContent =
+          `Auto-approves at ${deadlineDate.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} on ${deadlineDate.toLocaleDateString()}`;
+
+        if (_bugReviewInterval) clearInterval(_bugReviewInterval);
+        _bugReviewInterval = setInterval(() => {
+          const remaining = deadlineMs - Date.now();
+          const display = document.getElementById("bugReviewCountdown");
+          if (remaining <= 0) {
+            display.textContent = "Expired";
+            display.style.color = "var(--text-dim)";
+            clearInterval(_bugReviewInterval);
+            setTimeout(loadBugReviewQueue, 3000);
+            return;
+          }
+          const h = Math.floor(remaining / 3600000);
+          const m = Math.floor((remaining % 3600000) / 60000);
+          const s = Math.floor((remaining % 60000) / 1000);
+          display.textContent = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+          display.style.color = remaining < 3600000 ? "var(--red)" : "#e09000";
+        }, 1000);
+      }
+    } catch(e) { console.warn("loadBugReviewQueue error:", e.message); }
+  }
+
+  async function resolveBugReview(action) {
+    const label = action === "rollback" ? "Roll back to the previous stable version? This will push the previous stable HTML to GitHub immediately." : "Approve the beta and close this review?";
+    if (!confirm(label)) return;
+    try {
+      const r = await fetch(`${BASE}/counter?action=resolveBugReview`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      if (action === "rollback") {
+        alert("Rollback pushed to GitHub. CI/CD will deploy the previous stable version in ~2 minutes.");
+      }
+      await loadBugReviewQueue();
+      await syncBetaState();
+    } catch(e) { alert("Failed: " + e.message); }
+  }
+
   (async () => {
     if (await checkAuth()) {
       loadLogs();
       loadFeedback();
-      // Await settings so _autoPromoteMinutes is populated before syncBetaState runs countdown
+      // Await settings so _autoPromoteMinutes and modal seconds are populated before syncBetaState
       await loadThreshold();
       syncBetaState();
+      loadBugReviewQueue();
       setInterval(async () => {
         await syncBetaState();
         await loadFeedback();
+        await loadBugReviewQueue();
       }, 15000);
     }
   })();
