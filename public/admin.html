@@ -215,6 +215,7 @@
     .badge-pending    { background: #3d2b00; color: #e09000; }
     .badge-reviewed   { background: #0d2a3d; color: var(--blue); }
     .badge-implemented{ background: #0d2d17; color: var(--green); }
+    .badge-deployed   { background: #0d3020; color: #50d890; border: 1px solid #30a060; }
     .badge-dismissed  { background: #1c1c1c; color: var(--text-dim); }
     .badge-bug        { background: #3d1a1a; color: #f07070; }
     .badge-feature    { background: #1a2a3d; color: #80b8ff; }
@@ -539,8 +540,8 @@
     <option value="">All statuses</option>
     <option value="pending">Pending</option>
     <option value="reviewed">Reviewed</option>
-    <option value="implemented">Implemented</option>
     <option value="dismissed">Dismissed</option>
+    <option value="deployed">Deployed</option>
   </select>
   <button class="btn-refresh" onclick="loadFeedback()">⟳ Refresh</button>
 </div>
@@ -906,8 +907,9 @@
         <td class="td-msg"><div class="truncate" onclick="this.classList.toggle('expanded')">${escHtml(r.text || "")}</div></td>
         <td class="td-time">${escHtml(r.sessionDate || "—")}</td>
         <td>
-          <select class="status-select" onchange="updateFeedbackStatus('${r.id}', this.value)">
-            ${["pending","reviewed","implemented","dismissed"].map(s =>
+          <span class="badge badge-${r.status||'pending'}" style="margin-right:4px">${r.status||'pending'}</span>
+          <select class="status-select" onchange="updateFeedbackStatus('${r.id}', this.value)" style="width:94px">
+            ${["pending","reviewed","dismissed","deployed"].map(s =>
               `<option value="${s}"${r.status===s?" selected":""}>${s}</option>`
             ).join("")}
           </select>
