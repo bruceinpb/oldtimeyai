@@ -1114,15 +1114,26 @@
             cursor: not-allowed;
             pointer-events: none;
         }
-        /* Flash when a new beta has just been published */
+        /* Beta available — large pulsing button */
         .btn-beta.beta-available {
-            animation: betaFlash 1.6s ease-in-out infinite;
+            animation: betaPulse 1.8s ease-in-out infinite;
             border-color: var(--gold, #d4a017);
             background: #2a2000;
+            font-size: 14px;
+            padding: 8px 18px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
         }
-        @keyframes betaFlash {
-            0%, 100% { box-shadow: none;                              opacity: 1; }
-            50%       { box-shadow: 0 0 18px rgba(212,160,23,0.85);  opacity: 0.85; }
+        @keyframes betaPulse {
+            0%, 100% { box-shadow: 0 0 6px rgba(212,160,23,0.4);  transform: scale(1);    opacity: 1; }
+            50%       { box-shadow: 0 0 22px rgba(212,160,23,0.9); transform: scale(1.08); opacity: 0.95; }
+        }
+        /* After user has clicked beta — stable style, still active */
+        .btn-beta.beta-seen {
+            border-color: var(--gold, #d4a017);
+            background: #1a1500;
+            opacity: 0.85;
+            font-size: 12px;
         }
 
         /* ── AutoPilot: Feedback Modal ───────────────────────────── */
@@ -1389,7 +1400,7 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                 <!-- AutoPilot: side banners -->
                 <div class="feedback-banners">
                     <button class="feedback-btn btn-report-bug" onclick="openFeedbackModal('bug')">🐛 Report Bug or Request Feature</button>
-                    <button class="feedback-btn btn-beta disabled" id="betaBtn" onclick="loadBetaVersion()" title="No beta version available yet">⚗ Use Beta Version</button>
+                    <button class="feedback-btn btn-beta disabled" id="betaBtn" onclick="applyBetaVersion()" title="No beta version available yet">⚗ Use Beta Version</button>
                 </div>
 
                 </div><!-- /.date-machine-wrapper -->
@@ -2065,70 +2076,72 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                 const betaBtn = document.getElementById('betaBtn');
                 if (!betaBtn) return;
 
-                const isLive = data.exists && (data.status === 'published' || data.status === 'promoted');
-
-                if (isLive) {
-                    // Enable button
-                    betaBtn.classList.remove('disabled');
+                if (data.exists && data.html && data.status !== 'promoted') {
+                    betaBtn.classList.remove('disabled', 'beta-seen');
                     betaBtn.onclick = applyBetaVersion;
 
-                    // Flash if this is a NEW beta (different createdAt than last known)
-                    const isNew = data.createdAt && data.createdAt !== _lastKnownBetaCreatedAt;
+                    // Has user already clicked this beta this session?
+                    const seenAt = sessionStorage.getItem('beta_seen_at');
+                    const betaUpdatedAt = data.updatedAt || data.createdAt;
+                    const isNew = !seenAt || (betaUpdatedAt && new Date(betaUpdatedAt) > new Date(seenAt));
+
                     if (isNew) {
-                        _lastKnownBetaCreatedAt = data.createdAt;
+                        // New beta user hasn't seen — big pulsing button
                         betaBtn.classList.add('beta-available');
-                        betaBtn.title = '✨ New beta version available — click to try it!';
-                        // Show toast if page was already open (not first load)
-                        if (_lastKnownBetaCreatedAt !== null) {
-                            showToast('⚗ A new Beta Version is now available!');
-                        }
+                        const layers = data.patchLayers || 1;
+                        const bugs = data.bugCount || 0;
+                        const features = data.featureCount || 0;
+                        const parts = [];
+                        if (bugs)     parts.push(`${bugs} bug${bugs>1?'s':''}`);
+                        if (features) parts.push(`${features} feature${features>1?'s':''}`);
+                        const desc = parts.length ? parts.join(' + ') : 'updates';
+                        betaBtn.textContent = `✨ New Beta Available — ${desc}`;
+                        betaBtn.title = `AutoPilot has fixed ${desc}. Click to try the beta version!`;
                     } else {
-                        betaBtn.title = 'Beta version available — click to try it';
+                        // User has already seen this beta — stable smaller style
+                        betaBtn.classList.remove('beta-available');
+                        betaBtn.classList.add('beta-seen');
+                        betaBtn.textContent = '⚗ Try Beta Again';
+                        betaBtn.title = 'Beta version available — click to switch back';
                     }
                 } else {
-                    // No beta — grey out, stop flashing
+                    // No beta available
                     betaBtn.classList.add('disabled');
-                    betaBtn.classList.remove('beta-available');
+                    betaBtn.classList.remove('beta-available', 'beta-seen');
+                    betaBtn.textContent = '⚗ Use Beta Version';
                     betaBtn.title = 'No beta version available yet';
-                    _lastKnownBetaCreatedAt = null;
+                    betaBtn.onclick = null;
                 }
-            } catch (e) {
-                console.warn('Beta check failed:', e.message);
-            }
+            } catch(e) { /* silent */ }
         }
 
-        // Start the 5-minute client-side poller
-        function startBetaPoller() {
-            // Check immediately on load
-            checkBetaStatus();
-            // Then poll every 5 minutes (300,000ms)
-            _betaPollerInterval = setInterval(checkBetaStatus, 5 * 60 * 1000);
-        }
-
-        // Called when user clicks "Use Beta Version"
+        // Called when user clicks beta button
         async function applyBetaVersion() {
             const betaBtn = document.getElementById('betaBtn');
             betaBtn.textContent = '⚗ Loading...';
+            betaBtn.classList.remove('beta-available');
             try {
                 const r = await fetch(BETA_ENDPOINT);
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const data = await r.json();
                 if (!data.exists || !data.html) throw new Error('No beta HTML found.');
 
+                // Record that user has seen this beta
+                sessionStorage.setItem('beta_seen_at', new Date().toISOString());
+                sessionStorage.setItem('using_beta', 'true');
+
                 // Stop poller before swap
                 if (_betaPollerInterval) clearInterval(_betaPollerInterval);
 
-                // Mark session as beta before swapping
-                sessionStorage.setItem('using_beta', 'true');
-
-                // Replace entire page with beta HTML (+ inject revert banner)
+                // Replace page with beta HTML + revert banner
                 const betaHtml = injectRevertBanner(data.html);
                 document.open();
                 document.write(betaHtml);
                 document.close();
 
             } catch (e) {
-                betaBtn.textContent = '⚗ Use Beta Version';
+                betaBtn.classList.add('beta-available');
+                betaBtn.textContent = '✨ New Beta — Click to Try';
                 showToast('⚠ Could not load beta: ' + e.message);
             }
         }
@@ -2157,7 +2170,9 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         if (_isBetaSession) {
             applyBetaVersion();
         } else {
-            startBetaPoller();
+            // Start beta poller — check every 60s so users see new betas quickly
+            checkBetaStatus();
+            _betaPollerInterval = setInterval(checkBetaStatus, 60 * 1000);
         }
 
         // Close feedback modal on overlay click
