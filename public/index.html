@@ -1171,71 +1171,75 @@
             font-size: 12px;
         }
 
-        /* ── New Version Available Modal ─────────────────────────────────── */
-        #newVersionOverlay {
+        /* ── Incoming Update Modal ───────────────────────────────────────── */
+        #updateOverlay {
             display: none;
             position: fixed;
             inset: 0;
             z-index: 99998;
-            background: rgba(10, 6, 3, 0.78);
+            background: rgba(10, 6, 3, 0.82);
             justify-content: center;
             align-items: center;
             padding: 20px;
+            cursor: pointer;
         }
-        #newVersionOverlay.active { display: flex; }
-        #newVersionModal {
-            background: linear-gradient(160deg, #2a1a08 0%, #1a0f05 100%);
-            border: 2px solid #d4a017;
+        #updateOverlay.active { display: flex; }
+        #updateModal {
+            background: linear-gradient(160deg, #1a0a08 0%, #0f0805 100%);
+            border: 2px solid #c0392b;
             border-radius: 12px;
-            padding: 36px 32px 28px;
-            max-width: 460px;
+            padding: 32px 30px 26px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 0 60px rgba(212,160,23,.3), 0 20px 60px rgba(0,0,0,.7);
+            box-shadow: 0 0 60px rgba(192,57,43,.3), 0 20px 60px rgba(0,0,0,.7);
             font-family: 'Special Elite', Georgia, serif;
-            animation: nvmIn .4s cubic-bezier(.34,1.56,.64,1);
+            animation: updateIn .4s cubic-bezier(.34,1.56,.64,1);
+            cursor: default;
         }
-        @keyframes nvmIn {
-            from { opacity: 0; transform: scale(.85) translateY(20px); }
-            to   { opacity: 1; transform: scale(1)  translateY(0); }
+        @keyframes updateIn {
+            from { opacity: 0; transform: scale(.88) translateY(16px); }
+            to   { opacity: 1; transform: scale(1)   translateY(0); }
         }
-        #newVersionModal .nvm-gear {
-            font-size: 38px; display: block; margin-bottom: 10px;
-            animation: nvmSpin 8s linear infinite;
+        #updateModal .upd-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+        #updateModal .upd-title {
+            font-size: 20px; font-weight: 700; color: #e74c3c;
+            letter-spacing: .04em; margin-bottom: 12px;
+            text-shadow: 0 0 12px rgba(231,76,60,.4);
         }
-        @keyframes nvmSpin { to { transform: rotate(360deg); } }
-        #newVersionModal .nvm-title {
-            font-size: 20px; font-weight: 700; color: #d4a017;
-            letter-spacing: .04em; margin-bottom: 8px;
-            text-shadow: 0 0 12px rgba(212,160,23,.5);
+        #updateModal .upd-countdown {
+            font-size: 52px; font-weight: 900; color: #e74c3c;
+            font-family: 'Special Elite', monospace; line-height: 1;
+            margin: 10px 0 6px;
+            text-shadow: 0 0 20px rgba(231,76,60,.5);
+            transition: color .5s;
         }
-        #newVersionModal .nvm-desc {
-            font-size: 13px; color: #c8b090; margin-bottom: 22px; line-height: 1.5;
+        #updateModal .upd-countdown.urgent { color: #ff2222; animation: urgentPulse .5s ease-in-out infinite; }
+        @keyframes urgentPulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+        #updateModal .upd-label { font-size: 12px; color: #9a7060; margin-bottom: 16px; letter-spacing:.08em; text-transform: uppercase; }
+        #updateModal .upd-body { font-size: 13px; color: #c8a090; line-height: 1.65; margin-bottom: 18px; }
+        #updateModal .upd-body strong { color: #e8d0a0; }
+        #updateModal .upd-bug-btn {
+            background: #3d1a1a; border: 1px solid #e74c3c; color: #e74c3c;
+            padding: 10px 22px; border-radius: 8px; cursor: pointer;
+            font-family: 'Special Elite', Georgia, serif; font-size: 13px; font-weight: 700;
+            transition: all .2s; margin-bottom: 14px;
         }
-        #newVersionModal .nvm-desc strong { color: #e8d0a0; }
-        #newVersionModal .nvm-btns {
-            display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+        #updateModal .upd-bug-btn:hover { background: #5a2020; box-shadow: 0 0 12px rgba(231,76,60,.3); }
+        #updateModal .upd-dismiss-note { font-size: 11px; color: #5a4030; font-style: italic; }
+        /* Bug report textarea inside modal */
+        #updateBugForm { display: none; margin-top: 14px; }
+        #updateBugText {
+            width: 100%; background: #1a0f0a; border: 1px solid #5a3030; color: #e0c0b0;
+            border-radius: 6px; padding: 10px; font-size: 12px; font-family: 'Special Elite', Georgia, serif;
+            resize: vertical; min-height: 80px; outline: none;
         }
-        #newVersionModal .nvm-accept {
-            background: linear-gradient(135deg, #3a2800, #2a1a00);
-            border: 2px solid #d4a017; color: #d4a017;
-            padding: 12px 24px; border-radius: 8px; cursor: pointer;
+        #updateBugText:focus { border-color: #e74c3c; }
+        #updateBugSubmit {
+            margin-top: 8px; background: #5a0808; border: 1px solid #e74c3c; color: #e74c3c;
+            padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700;
             font-family: 'Special Elite', Georgia, serif;
-            font-size: 14px; font-weight: 700; flex: 1; min-width: 140px;
-            transition: all .2s;
         }
-        #newVersionModal .nvm-accept:hover {
-            background: linear-gradient(135deg, #4a3600, #3a2400);
-            box-shadow: 0 0 16px rgba(212,160,23,.4);
-        }
-        #newVersionModal .nvm-dismiss {
-            background: transparent; border: 1px solid #5a4030; color: #8a7060;
-            padding: 12px 20px; border-radius: 8px; cursor: pointer;
-            font-family: 'Special Elite', Georgia, serif;
-            font-size: 13px; flex: 1; min-width: 120px; transition: all .2s;
-        }
-        #newVersionModal .nvm-dismiss:hover { border-color: #8a6040; color: #b09080; }
-        #newVersionModal .nvm-note { font-size: 11px; color: #6a5040; margin-top: 14px; }
 
         /* ── AutoPilot: Feedback Modal ───────────────────────────── */
         .feedback-overlay {
@@ -1407,8 +1411,8 @@
                     <div class="card-label">Victorian Age</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1520637836862-4d197d17c78a?w=400&h=500&fit=crop" alt="Old English castle">
-                    <div class="card-label">English Castle</div>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Workshop_of_Hans_Holbein_the_Younger_-_Portrait_of_Henry_VIII_-_Google_Art_Project.jpg/800px-Workshop_of_Hans_Holbein_the_Younger_-_Portrait_of_Henry_VIII_-_Google_Art_Project.jpg" alt="Henry VIII">
+                    <div class="card-label">Henry VIII</div>
                 </div>
                 <div class="vintage-card">
                     <img src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop" alt="Picasso Painting">
@@ -1601,17 +1605,25 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
     </div>
 
     <!-- AutoPilot: Feedback Modal -->
-    <!-- ── New Version Available Modal ─────────────────────────────── -->
-    <div id="newVersionOverlay">
-      <div id="newVersionModal">
-        <span class="nvm-gear">⚙</span>
-        <div class="nvm-title">✦ New Version Available ✦</div>
-        <div class="nvm-desc" id="nvmDesc">AutoPilot has prepared an update.</div>
-        <div class="nvm-btns">
-          <button class="nvm-accept" id="nvmAcceptBtn" onclick="nvmAccept()">⚗ Try New Version</button>
-          <button class="nvm-dismiss" onclick="nvmDismiss()">✕ Keep Current Version</button>
+    <!-- ── Incoming Update Modal ──────────────────────────────────── -->
+    <div id="updateOverlay" onclick="updateOverlayClick(event)">
+      <div id="updateModal">
+        <span class="upd-icon">⚙</span>
+        <div class="upd-title">⚠ New Version Incoming</div>
+        <div class="upd-countdown" id="updateCountdown">30</div>
+        <div class="upd-label">seconds until update</div>
+        <div class="upd-body" id="updateBody">
+          You have <strong id="updateSecondsText">30</strong> seconds to complete your work before the new version appears.<br><br>
+          In case of a major bug, click the button below to report it.
+          You will have <strong id="updateBugWindowText">5</strong> minutes to report the bug after the update loads.<br><br>
+          <em id="updateDismissNote">Click this window to dismiss — the update will still take place.</em>
         </div>
-        <div class="nvm-note">You can switch versions anytime using the button at the bottom of the page.</div>
+        <button class="upd-bug-btn" onclick="showUpdateBugForm(event)">🐛 Report a Critical Bug</button>
+        <div id="updateBugForm">
+          <textarea id="updateBugText" placeholder="Describe the bug you've found..."></textarea>
+          <button id="updateBugSubmit" onclick="submitUpdateBug(event)">Submit Bug Report</button>
+        </div>
+        <div class="upd-dismiss-note">Clicking anywhere outside this box will dismiss the countdown display, but the update will still load automatically.</div>
       </div>
     </div>
 
@@ -2331,55 +2343,157 @@ let _lastKnownBetaCreatedAt = null;
         let _betaData = null;
 
         // Update beta button state — called on load and every 5 min by poller
-        // ── New Version Modal functions ─────────────────────────────────
-        function showNewVersionModal(data) {
-            // Create modal DOM if missing (old beta blobs won't have it)
-            let overlay = document.getElementById('newVersionOverlay');
+        // ── Incoming Update Modal ──────────────────────────────────────────
+        let _updateTimer = null;       // the mandatory auto-reload timer
+        let _updateBetaData = null;    // beta data for the current update
+
+        function showUpdateModal(data) {
+            // Get configurable values from server response
+            const clientModalSeconds   = data.clientModalSeconds     || 30;
+            const bugReportWindowMins  = data.bugReportWindowMinutes || 5;
+
+            _updateBetaData = data;
+
+            // Build or reuse modal DOM (handles old beta blobs that don't have it)
+            let overlay = document.getElementById('updateOverlay');
             if (!overlay) {
+                // Inject CSS + HTML dynamically for old beta blobs
                 const style = document.createElement('style');
-                style.textContent = '#newVersionOverlay{display:none;position:fixed;inset:0;z-index:99998;background:rgba(10,6,3,.78);justify-content:center;align-items:center;padding:20px}#newVersionOverlay.active{display:flex}#newVersionModal{background:linear-gradient(160deg,#2a1a08,#1a0f05);border:2px solid #d4a017;border-radius:12px;padding:36px 32px 28px;max-width:460px;width:100%;text-align:center;box-shadow:0 0 60px rgba(212,160,23,.3),0 20px 60px rgba(0,0,0,.7);font-family:"Special Elite",Georgia,serif;animation:nvmIn .4s cubic-bezier(.34,1.56,.64,1)}@keyframes nvmIn{from{opacity:0;transform:scale(.85) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}#newVersionModal .nvm-gear{font-size:38px;display:block;margin-bottom:10px;animation:nvmSpin 8s linear infinite}@keyframes nvmSpin{to{transform:rotate(360deg)}}#newVersionModal .nvm-title{font-size:20px;font-weight:700;color:#d4a017;letter-spacing:.04em;margin-bottom:8px}#newVersionModal .nvm-desc{font-size:13px;color:#c8b090;margin-bottom:22px;line-height:1.5}#newVersionModal .nvm-desc strong{color:#e8d0a0}#newVersionModal .nvm-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}#newVersionModal .nvm-accept{background:linear-gradient(135deg,#3a2800,#2a1a00);border:2px solid #d4a017;color:#d4a017;padding:12px 24px;border-radius:8px;cursor:pointer;font-family:"Special Elite",Georgia,serif;font-size:14px;font-weight:700;flex:1;min-width:140px}#newVersionModal .nvm-dismiss{background:transparent;border:1px solid #5a4030;color:#8a7060;padding:12px 20px;border-radius:8px;cursor:pointer;font-size:13px;flex:1;min-width:120px}#newVersionModal .nvm-note{font-size:11px;color:#6a5040;margin-top:14px}';
+                style.textContent = [
+                  '#updateOverlay{display:none;position:fixed;inset:0;z-index:99998;background:rgba(10,6,3,.82);justify-content:center;align-items:center;padding:20px;cursor:pointer}',
+                  '#updateOverlay.active{display:flex}',
+                  '#updateModal{background:linear-gradient(160deg,#1a0a08,#0f0805);border:2px solid #c0392b;border-radius:12px;padding:32px 30px 26px;max-width:500px;width:100%;text-align:center;box-shadow:0 0 60px rgba(192,57,43,.3),0 20px 60px rgba(0,0,0,.7);font-family:"Special Elite",Georgia,serif;animation:updateIn .4s cubic-bezier(.34,1.56,.64,1);cursor:default}',
+                  '@keyframes updateIn{from{opacity:0;transform:scale(.88) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}',
+                  '#updateModal .upd-icon{font-size:36px;display:block;margin-bottom:10px}',
+                  '#updateModal .upd-title{font-size:20px;font-weight:700;color:#e74c3c;letter-spacing:.04em;margin-bottom:12px}',
+                  '#updateModal .upd-countdown{font-size:52px;font-weight:900;color:#e74c3c;font-family:"Special Elite",monospace;line-height:1;margin:10px 0 6px;text-shadow:0 0 20px rgba(231,76,60,.5)}',
+                  '#updateModal .upd-countdown.urgent{color:#ff2222;animation:urgentPulse .5s ease-in-out infinite}',
+                  '@keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:.7}}',
+                  '#updateModal .upd-label{font-size:12px;color:#9a7060;margin-bottom:16px;letter-spacing:.08em;text-transform:uppercase}',
+                  '#updateModal .upd-body{font-size:13px;color:#c8a090;line-height:1.65;margin-bottom:18px}',
+                  '#updateModal .upd-body strong{color:#e8d0a0}',
+                  '#updateModal .upd-bug-btn{background:#3d1a1a;border:1px solid #e74c3c;color:#e74c3c;padding:10px 22px;border-radius:8px;cursor:pointer;font-family:"Special Elite",Georgia,serif;font-size:13px;font-weight:700;margin-bottom:14px}',
+                  '#updateModal .upd-dismiss-note{font-size:11px;color:#5a4030;font-style:italic}',
+                  '#updateBugForm{display:none;margin-top:14px}',
+                  '#updateBugText{width:100%;background:#1a0f0a;border:1px solid #5a3030;color:#e0c0b0;border-radius:6px;padding:10px;font-size:12px;font-family:"Special Elite",Georgia,serif;resize:vertical;min-height:80px;outline:none}',
+                  '#updateBugSubmit{margin-top:8px;background:#5a0808;border:1px solid #e74c3c;color:#e74c3c;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:"Special Elite",Georgia,serif}'
+                ].join('');
                 document.head.appendChild(style);
                 overlay = document.createElement('div');
-                overlay.id = 'newVersionOverlay';
-                overlay.innerHTML = '<div id="newVersionModal"><span class="nvm-gear">⚙</span><div class="nvm-title">✦ New Version Available ✦</div><div class="nvm-desc" id="nvmDesc"></div><div class="nvm-btns"><button class="nvm-accept" id="nvmAcceptBtn" onclick="nvmAccept()">⚗ Try New Version</button><button class="nvm-dismiss" onclick="nvmDismiss()">✕ Keep Current Version</button></div><div class="nvm-note">You can switch versions anytime using the button at the bottom of the page.</div></div>';
+                overlay.id = 'updateOverlay';
+                overlay.setAttribute('onclick', 'updateOverlayClick(event)');
+                overlay.innerHTML = [
+                  '<div id="updateModal">',
+                  '<span class="upd-icon">⚙</span>',
+                  '<div class="upd-title">⚠ New Version Incoming</div>',
+                  '<div class="upd-countdown" id="updateCountdown">30</div>',
+                  '<div class="upd-label">seconds until update</div>',
+                  '<div class="upd-body" id="updateBody"></div>',
+                  '<button class="upd-bug-btn" onclick="showUpdateBugForm(event)">🐛 Report a Critical Bug</button>',
+                  '<div id="updateBugForm">',
+                  '<textarea id="updateBugText" placeholder="Describe the bug..."></textarea>',
+                  '<button id="updateBugSubmit" onclick="submitUpdateBug(event)">Submit Bug Report</button>',
+                  '</div>',
+                  '<div class="upd-dismiss-note">Click anywhere outside this box to dismiss — the update will still load automatically.</div>',
+                  '</div>'
+                ].join('');
                 document.body.appendChild(overlay);
             }
 
-            const bugs     = data.bugCount     || 0;
-            const features = data.featureCount || 0;
-            const layers   = data.patchLayers  || 1;
-            const parts = [];
-            if (bugs)     parts.push(`${bugs} bug${bugs>1?'s':''} fixed`);
-            if (features) parts.push(`${features} feature${features>1?'s':''} added`);
-            const desc = parts.length ? parts.join(' and ') : 'improvements made';
-            const layerNote = layers > 1 ? ` (${layers} patch layers)` : '';
+            // Populate text
+            const bodyEl = document.getElementById('updateBody');
+            if (bodyEl) {
+                bodyEl.innerHTML = `You have <strong>${clientModalSeconds} seconds</strong> to complete your work before the new version appears.<br><br>` +
+                    `In case of a major bug, click the button below to report it. ` +
+                    `You will have <strong>${bugReportWindowMins} minutes</strong> to report the bug after the update loads.<br><br>` +
+                    `<em>Click this window to dismiss — the update will still take place and you could lose unsaved work.</em>`;
+            }
+            // Update static elements if they exist
+            const secText = document.getElementById('updateSecondsText');
+            if (secText) secText.textContent = clientModalSeconds;
+            const winText = document.getElementById('updateBugWindowText');
+            if (winText) winText.textContent = bugReportWindowMins;
 
-            const descEl = document.getElementById('nvmDesc');
-            if (descEl) descEl.innerHTML = `AutoPilot has prepared an update: <strong>${desc}</strong>${layerNote}.`;
-
-            const isBeta = sessionStorage.getItem('using_beta') === 'true';
-            const acceptBtn = document.getElementById('nvmAcceptBtn');
-            if (acceptBtn) acceptBtn.textContent = isBeta ? '⚗ Load Latest Beta' : '⚗ Try New Beta Version';
-
-            overlay.onclick = function(e) { if (e.target === overlay) nvmDismiss(); };
             overlay.classList.add('active');
+
+            // Start visual countdown
+            let remaining = clientModalSeconds;
+            const countdownEl = document.getElementById('updateCountdown');
+            if (countdownEl) countdownEl.textContent = remaining;
+
+            const tickInterval = setInterval(() => {
+                remaining--;
+                if (countdownEl) {
+                    countdownEl.textContent = remaining;
+                    if (remaining <= 5) countdownEl.classList.add('urgent');
+                }
+                if (remaining <= 0) clearInterval(tickInterval);
+            }, 1000);
+
+            // Store bug report window in sessionStorage for post-reload reporting
+            const bugWindowEnd = new Date(Date.now() + (bugReportWindowMins * 60 * 1000)).toISOString();
+            sessionStorage.setItem('bug_report_window_end', bugWindowEnd);
+            sessionStorage.setItem('bug_report_beta_created', data.updatedAt || data.createdAt || '');
+            sessionStorage.setItem('bug_report_window_mins', String(bugReportWindowMins));
+            sessionStorage.setItem('bug_report_modal_secs', String(clientModalSeconds));
+
+            // MANDATORY: auto-reload fires after countdown regardless of dismiss
+            if (_updateTimer) clearTimeout(_updateTimer);
+            _updateTimer = setTimeout(() => {
+                overlay.classList.remove('active');
+                applyBetaVersion();
+            }, clientModalSeconds * 1000);
         }
 
-        function nvmDismiss() {
-            const overlay = document.getElementById('newVersionOverlay');
-            if (overlay) overlay.classList.remove('active');
-            // Store seen timestamp so modal won't re-appear for this beta version
-            if (_betaData) {
-                const ts = _betaData.updatedAt || _betaData.createdAt || new Date().toISOString();
-                sessionStorage.setItem('beta_seen_at', ts);
+        function updateOverlayClick(event) {
+            // Clicking the OVERLAY (not the modal itself) dismisses the display
+            // but the _updateTimer still fires — update WILL happen
+            if (event.target === document.getElementById('updateOverlay')) {
+                document.getElementById('updateOverlay').classList.remove('active');
+                // Timer keeps running invisibly
             }
         }
 
-        async function nvmAccept() {
-            const overlay = document.getElementById('newVersionOverlay');
-            if (overlay) overlay.classList.remove('active');
-            await applyBetaVersion();
+        function showUpdateBugForm(event) {
+            event.stopPropagation();
+            const form = document.getElementById('updateBugForm');
+            if (form) form.style.display = form.style.display === 'block' ? 'none' : 'block';
         }
+
+        async function submitUpdateBug(event) {
+            event.stopPropagation();
+            const text = document.getElementById('updateBugText')?.value?.trim();
+            if (!text) { alert('Please describe the bug.'); return; }
+            const btn = document.getElementById('updateBugSubmit');
+            if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+            try {
+                const clientModalSeconds   = (_updateBetaData?.clientModalSeconds)     || 30;
+                const bugReportWindowMins  = (_updateBetaData?.bugReportWindowMinutes) || 5;
+                const r = await fetch(COUNTER_ENDPOINT.replace('/counter', '') + '/counter?action=flagBugReport', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text,
+                        betaCreatedAt: _updateBetaData?.createdAt || null,
+                        clientModalSeconds,
+                        bugReportWindowMinutes: bugReportWindowMins
+                    })
+                });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                showToast('✦ Critical bug report submitted. Admin will review within 12 hours. ✦');
+                const form = document.getElementById('updateBugForm');
+                if (form) form.style.display = 'none';
+                document.getElementById('updateOverlay').classList.remove('active');
+            } catch(e) {
+                showToast('⚠ Could not submit report: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = 'Submit Bug Report'; }
+            }
+        }
+
+        // Legacy nvmAccept/nvmDismiss removed — replaced by updateModal
+        // Keep nvmDismiss as no-op for any cached beta HTML that might call it
+        function nvmDismiss() {}
+        function nvmAccept() { applyBetaVersion(); }
 
         // ── Beta status poller ─────────────────────────────────────────────
         async function checkBetaStatus() {
@@ -2401,10 +2515,10 @@ let _lastKnownBetaCreatedAt = null;
                     const isNew = !seenAt || (betaUpdatedAt && new Date(betaUpdatedAt) > new Date(seenAt));
 
                     if (isNew) {
-                        // Show center modal for newly detected beta
+                        // Show mandatory update countdown modal for newly detected beta
                         if (_lastKnownBetaCreatedAt !== betaUpdatedAt) {
                             _lastKnownBetaCreatedAt = betaUpdatedAt;
-                            showNewVersionModal(data);
+                            showUpdateModal(data);
                         }
                         // Update bottom button
                         betaBtn.classList.add('beta-available');
@@ -2468,22 +2582,63 @@ let _lastKnownBetaCreatedAt = null;
 
         // Injects a persistent top banner into the beta HTML so users can revert
         function injectRevertBanner(html) {
+            // Check if we're within the bug report window
+            const bugWindowEnd = sessionStorage.getItem('bug_report_window_end');
+            const withinWindow = bugWindowEnd && new Date() < new Date(bugWindowEnd);
+            const bugWindowMins = sessionStorage.getItem('bug_report_window_mins') || '5';
+
+            const bugBtn = withinWindow
+                ? `<button onclick="showPostReloadBugReport()" style="
+                    background:#3d0808;border:1px solid #e74c3c;color:#e74c3c;
+                    padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-left:8px;
+                  ">🐛 Report Bug (${bugWindowMins}min window)</button>`
+                : '';
+
             const banner = `
 <div id="betaRevertBanner" style="
   position:fixed;top:0;left:0;right:0;z-index:99999;
   background:#0d2a3d;border-bottom:2px solid #58a6ff;
   padding:8px 16px;display:flex;align-items:center;justify-content:space-between;
   font-family:'Special Elite',monospace;font-size:13px;color:#58a6ff;
+  flex-wrap:wrap;gap:6px;
 ">
   <span>⚗ You are using the <strong>Beta Version</strong> — features may be unstable.</span>
-  <button onclick="sessionStorage.removeItem('using_beta');location.reload();" style="
-    background:#3d1a1a;border:1px solid #da3633;color:#da3633;
-    padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;
-  ">✕ Return to Stable</button>
+  <div style="display:flex;gap:6px;align-items:center">
+    ${bugBtn}
+    <button onclick="sessionStorage.removeItem('using_beta');location.reload();" style="
+      background:#3d1a1a;border:1px solid #da3633;color:#da3633;
+      padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;
+    ">✕ Return to Stable</button>
+  </div>
 </div>
-<div style="height:44px"></div>`;
-            // Insert banner right after <body>
+<div style="height:48px"></div>`;
             return html.replace(/<body[^>]*>/, (match) => match + banner);
+        }
+
+        // Called from post-reload "Report Bug" button in banner
+        function showPostReloadBugReport() {
+            const bugWindowEnd = sessionStorage.getItem('bug_report_window_end');
+            if (bugWindowEnd && new Date() > new Date(bugWindowEnd)) {
+                showToast('⚠ The bug report window has expired.');
+                return;
+            }
+            const text = prompt('Describe the bug you encountered after the update:');
+            if (!text || !text.trim()) return;
+            const clientModalSeconds  = parseInt(sessionStorage.getItem('bug_report_modal_secs') || '30');
+            const bugReportWindowMins = parseInt(sessionStorage.getItem('bug_report_window_mins') || '5');
+            const betaCreatedAt       = sessionStorage.getItem('bug_report_beta_created') || null;
+
+            fetch(API_BASE + '/counter?action=flagBugReport', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text.trim(), betaCreatedAt, clientModalSeconds, bugReportWindowMinutes: bugReportWindowMins })
+            }).then(r => r.ok ? r.json() : Promise.reject(r.status))
+              .then(() => {
+                showToast('✦ Critical bug report submitted. Admin will review within 12 hours. ✦');
+                // Hide the bug report button after submitting
+                sessionStorage.removeItem('bug_report_window_end');
+              })
+              .catch(e => showToast('⚠ Could not submit report: ' + e));
         }
 
         // Always start poller — works on both stable and beta pages.
