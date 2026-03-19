@@ -860,15 +860,16 @@ exports.counter = onRequest(
         const lastHeartbeatAt   = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt    : null;
         trace.push({ step: 1, threshold, heartbeatInterval, lastHeartbeatAt: lastHeartbeatAt?.toDate?.()?.toISOString() || null });
 
-        let elapsedMin = null;
+        // Concurrency guard (mirrors real heartbeat — only blocks within 60s)
+        let elapsedSec = null;
         if (lastHeartbeatAt) {
-          elapsedMin = (Date.now() - lastHeartbeatAt.toDate().getTime()) / 60000;
-          if (elapsedMin < heartbeatInterval) {
-            trace.push({ step: 'EXIT', reason: 'interval not elapsed', elapsedMin });
+          elapsedSec = (Date.now() - lastHeartbeatAt.toDate().getTime()) / 1000;
+          if (elapsedSec < 60) {
+            trace.push({ step: 'EXIT', reason: 'duplicate invocation within 60s', elapsedSec });
             return res.json({ trace });
           }
         }
-        trace.push({ step: '1-PASS', elapsedMin });
+        trace.push({ step: '1-PASS', elapsedSec, note: 'concurrency guard passed (>60s)' });
 
         const [betaDoc, queueDoc] = await Promise.all([
           db.collection("config").doc("betaVersion").get(),
