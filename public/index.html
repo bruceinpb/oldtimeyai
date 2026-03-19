@@ -1136,6 +1136,111 @@
             font-size: 12px;
         }
 
+        /* ── New Version Available Modal ─────────────────────────────────── */
+        #newVersionOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99998;
+            background: rgba(10, 6, 3, 0.75);
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        #newVersionOverlay.active { display: flex; }
+
+        #newVersionModal {
+            background: linear-gradient(160deg, #2a1a08 0%, #1a0f05 100%);
+            border: 2px solid var(--gold, #d4a017);
+            border-radius: 12px;
+            padding: 36px 32px 28px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(212,160,23,0.3), 0 20px 60px rgba(0,0,0,0.7);
+            animation: nvmEntrance 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+            font-family: 'Special Elite', Georgia, serif;
+        }
+        @keyframes nvmEntrance {
+            from { opacity: 0; transform: scale(0.85) translateY(20px); }
+            to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        #newVersionModal .nvm-gear {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 12px;
+            animation: nvmSpin 8s linear infinite;
+        }
+        @keyframes nvmSpin { to { transform: rotate(360deg); } }
+        #newVersionModal .nvm-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--gold, #d4a017);
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+            text-shadow: 0 0 12px rgba(212,160,23,0.5);
+        }
+        #newVersionModal .nvm-desc {
+            font-size: 13px;
+            color: #c8b090;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        #newVersionModal .nvm-desc strong {
+            color: #e8d0a0;
+        }
+        #newVersionModal .nvm-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        #newVersionModal .nvm-accept {
+            background: linear-gradient(135deg, #3a2800, #2a1a00);
+            border: 2px solid var(--gold, #d4a017);
+            color: var(--gold, #d4a017);
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Special Elite', Georgia, serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 150px;
+        }
+        #newVersionModal .nvm-accept:hover {
+            background: linear-gradient(135deg, #4a3600, #3a2400);
+            box-shadow: 0 0 16px rgba(212,160,23,0.4);
+        }
+        #newVersionModal .nvm-dismiss {
+            background: transparent;
+            border: 1px solid #5a4030;
+            color: #8a7060;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Special Elite', Georgia, serif;
+            font-size: 13px;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+        #newVersionModal .nvm-dismiss:hover {
+            border-color: #8a6040;
+            color: #b09080;
+        }
+        #newVersionModal .nvm-divider {
+            border: none;
+            border-top: 1px solid #3a2a1a;
+            margin: 20px 0 16px;
+        }
+        #newVersionModal .nvm-note {
+            font-size: 11px;
+            color: #6a5040;
+        }
+
         /* ── AutoPilot: Feedback Modal ───────────────────────────── */
         .feedback-overlay {
             display: none;
@@ -1469,6 +1574,25 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
     </div>
 
     <!-- AutoPilot: Feedback Modal -->
+    <!-- ── New Version Available Modal ───────────────────────────────── -->
+    <div id="newVersionOverlay">
+      <div id="newVersionModal">
+        <span class="nvm-gear">⚙</span>
+        <div class="nvm-title">✦ New Version Available ✦</div>
+        <div class="nvm-desc" id="nvmDesc">AutoPilot has prepared an updated version.</div>
+        <div class="nvm-buttons">
+          <button class="nvm-accept" id="nvmAcceptBtn" onclick="nvmAccept()">
+            ⚗ Try New Version
+          </button>
+          <button class="nvm-dismiss" onclick="nvmDismiss()">
+            ✕ Keep Current Version
+          </button>
+        </div>
+        <hr class="nvm-divider">
+        <div class="nvm-note">You can always switch versions using the button at the bottom of the page.</div>
+      </div>
+    </div>
+
     <div class="feedback-overlay" id="feedbackOverlay">
         <div class="feedback-modal">
             <button class="feedback-modal-close" onclick="closeFeedbackModal()">&times;</button>
@@ -2066,13 +2190,60 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         const _isBetaSession = sessionStorage.getItem('using_beta') === 'true';
         let _betaPollerInterval = null;
         let _lastKnownBetaCreatedAt = null;
+        let _betaData = null;  // latest beta data from server
 
-        // Update beta button state — called on load and every 5 min by poller
+        // ── New Version Modal ──────────────────────────────────────────────
+        function showNewVersionModal(data) {
+            const bugs     = data.bugCount     || 0;
+            const features = data.featureCount || 0;
+            const layers   = data.patchLayers  || 1;
+            const parts = [];
+            if (bugs)     parts.push(`${bugs} bug${bugs>1?'s':''} fixed`);
+            if (features) parts.push(`${features} feature${features>1?'s':''} added`);
+            const desc = parts.length ? parts.join(' and ') : 'improvements made';
+            const layerNote = layers > 1 ? ` (${layers} patch layers stacked)` : '';
+
+            document.getElementById('nvmDesc').innerHTML =
+                `AutoPilot has prepared an update: <strong>${desc}</strong>${layerNote}.`;
+
+            // Update accept button label based on whether user is on stable or beta
+            const isBeta = sessionStorage.getItem('using_beta') === 'true';
+            const acceptBtn = document.getElementById('nvmAcceptBtn');
+            if (isBeta) {
+                acceptBtn.textContent = '⚗ Load Latest Beta';
+            } else {
+                acceptBtn.textContent = '⚗ Try New Beta Version';
+            }
+
+            document.getElementById('newVersionOverlay').classList.add('active');
+        }
+
+        function nvmDismiss() {
+            document.getElementById('newVersionOverlay').classList.remove('active');
+            // Mark this beta as seen so modal won't re-appear this session
+            if (_betaData) {
+                const ts = _betaData.updatedAt || _betaData.createdAt || new Date().toISOString();
+                sessionStorage.setItem('beta_seen_at', ts);
+            }
+        }
+
+        async function nvmAccept() {
+            document.getElementById('newVersionOverlay').classList.remove('active');
+            await applyBetaVersion();
+        }
+
+        // Close modal on overlay background click
+        document.getElementById('newVersionOverlay').addEventListener('click', function(e) {
+            if (e.target === this) nvmDismiss();
+        });
+
+        // ── Beta status poller ─────────────────────────────────────────────
         async function checkBetaStatus() {
             try {
                 const r = await fetch(BETA_ENDPOINT);
                 if (!r.ok) return;
                 const data = await r.json();
+                _betaData = data;
                 const betaBtn = document.getElementById('betaBtn');
                 if (!betaBtn) return;
 
@@ -2080,32 +2251,35 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
                     betaBtn.classList.remove('disabled', 'beta-seen');
                     betaBtn.onclick = applyBetaVersion;
 
-                    // Has user already clicked this beta this session?
-                    const seenAt = sessionStorage.getItem('beta_seen_at');
                     const betaUpdatedAt = data.updatedAt || data.createdAt;
+                    const seenAt = sessionStorage.getItem('beta_seen_at');
                     const isNew = !seenAt || (betaUpdatedAt && new Date(betaUpdatedAt) > new Date(seenAt));
 
                     if (isNew) {
-                        // New beta user hasn't seen — big pulsing button
+                        // New beta — show the center modal (on both stable and beta pages)
+                        // Only show once per new version (check _lastKnownBetaCreatedAt)
+                        if (!_lastKnownBetaCreatedAt || _lastKnownBetaCreatedAt !== betaUpdatedAt) {
+                            _lastKnownBetaCreatedAt = betaUpdatedAt;
+                            showNewVersionModal(data);
+                        }
+
+                        // Also update the bottom button
                         betaBtn.classList.add('beta-available');
-                        const layers = data.patchLayers || 1;
                         const bugs = data.bugCount || 0;
                         const features = data.featureCount || 0;
                         const parts = [];
                         if (bugs)     parts.push(`${bugs} bug${bugs>1?'s':''}`);
                         if (features) parts.push(`${features} feature${features>1?'s':''}`);
                         const desc = parts.length ? parts.join(' + ') : 'updates';
-                        betaBtn.textContent = `✨ New Beta Available — ${desc}`;
-                        betaBtn.title = `AutoPilot has fixed ${desc}. Click to try the beta version!`;
+                        betaBtn.textContent = `✨ New Beta — ${desc}`;
+                        betaBtn.title = `AutoPilot has fixed ${desc}. Click to try!`;
                     } else {
-                        // User has already seen this beta — stable smaller style
                         betaBtn.classList.remove('beta-available');
                         betaBtn.classList.add('beta-seen');
                         betaBtn.textContent = '⚗ Try Beta Again';
                         betaBtn.title = 'Beta version available — click to switch back';
                     }
                 } else {
-                    // No beta available
                     betaBtn.classList.add('disabled');
                     betaBtn.classList.remove('beta-available', 'beta-seen');
                     betaBtn.textContent = '⚗ Use Beta Version';
@@ -2115,38 +2289,35 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             } catch(e) { /* silent */ }
         }
 
-        // Called when user clicks beta button
+        // ── Apply beta version ─────────────────────────────────────────────
         async function applyBetaVersion() {
             const betaBtn = document.getElementById('betaBtn');
-            betaBtn.textContent = '⚗ Loading...';
-            betaBtn.classList.remove('beta-available');
+            if (betaBtn) { betaBtn.textContent = '⚗ Loading...'; betaBtn.classList.remove('beta-available'); }
             try {
                 const r = await fetch(BETA_ENDPOINT);
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const data = await r.json();
                 if (!data.exists || !data.html) throw new Error('No beta HTML found.');
 
-                // Record that user has seen this beta
-                sessionStorage.setItem('beta_seen_at', new Date().toISOString());
+                // Mark as seen
+                const ts = data.updatedAt || data.createdAt || new Date().toISOString();
+                sessionStorage.setItem('beta_seen_at', ts);
                 sessionStorage.setItem('using_beta', 'true');
 
-                // Stop poller before swap
                 if (_betaPollerInterval) clearInterval(_betaPollerInterval);
 
-                // Replace page with beta HTML + revert banner
                 const betaHtml = injectRevertBanner(data.html);
                 document.open();
                 document.write(betaHtml);
                 document.close();
 
             } catch (e) {
-                betaBtn.classList.add('beta-available');
-                betaBtn.textContent = '✨ New Beta — Click to Try';
+                if (betaBtn) { betaBtn.classList.add('beta-available'); betaBtn.textContent = '✨ New Beta — Click to Try'; }
                 showToast('⚠ Could not load beta: ' + e.message);
             }
         }
 
-        // Injects a persistent top banner into the beta HTML so users can revert
+        // ── Inject revert banner into beta HTML ────────────────────────────
         function injectRevertBanner(html) {
             const banner = `
 <div id="betaRevertBanner" style="
@@ -2162,15 +2333,26 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
   ">✕ Return to Stable</button>
 </div>
 <div style="height:44px"></div>`;
-            // Insert banner right after <body>
-            return html.replace(/<body[^>]*>/, (match) => match + banner);
+            // Inject a poller-start script so even the beta page detects newer betas
+            const scriptOpen  = '<' + 'script>';
+            const scriptClose = '</' + 'script>';
+            const pollerPatch = scriptOpen +
+                'window.addEventListener("load",function(){' +
+                'if(typeof checkBetaStatus==="function"){' +
+                'checkBetaStatus();' +
+                '_betaPollerInterval=setInterval(checkBetaStatus,60000);' +
+                '}});' +
+                scriptClose;
+            return html.replace(/<body[^>]*>/, (match) => match + banner)
+                       .replace('</body>', pollerPatch + '</body>');
         }
 
-        // Auto-load beta if this session was already in beta (page reload)
+        // ── Init ───────────────────────────────────────────────────────────
         if (_isBetaSession) {
+            // Already in beta — reload the latest beta (picks up any new layers)
             applyBetaVersion();
         } else {
-            // Start beta poller — check every 60s so users see new betas quickly
+            // Start poller — check immediately then every 60s
             checkBetaStatus();
             _betaPollerInterval = setInterval(checkBetaStatus, 60 * 1000);
         }
