@@ -607,8 +607,8 @@ exports.counter = onRequest(
           updates.autoPromoteMinutes = val;
         }
         if (resetHeartbeat === true) {
-          // Reset the timer so the scheduler won't fire again until the next full interval
-          updates.lastHeartbeatAt = admin.firestore.FieldValue.serverTimestamp();
+          // Write epoch-0 so the next scheduler tick runs immediately (not delayed)
+          updates.lastHeartbeatAt = new admin.firestore.Timestamp(0, 0);
         }
         if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to save." });
         await db.collection("config").doc("settings").set(updates, { merge: true });
@@ -646,23 +646,27 @@ exports.counter = onRequest(
     if (req.method === "POST" && req.query.action === "heartbeat") {
       logger.info("AutoPilot heartbeat firing");
       try {
-        // ── 1. Enforce configurable interval ────────────────────────────
+        // ── 1. Read settings ────────────────────────────────────────────
+        // Cloud Scheduler (*/5 * * * *) is the rate limiter — no internal check needed.
+        // We write lastHeartbeatAt immediately to prevent concurrent Cloud Run invocations
+        // in the rare case two scheduler fires overlap.
         const settingsDoc = await db.collection("config").doc("settings").get();
         const threshold          = settingsDoc.exists ? (settingsDoc.data().threshold          || 1)    : 1;
         const heartbeatInterval  = settingsDoc.exists ? (settingsDoc.data().heartbeatInterval  || 5)    : 5;
         const autoPromoteMinutes = settingsDoc.exists ? (settingsDoc.data().autoPromoteMinutes || 1440) : 1440;
         const lastHeartbeatAt    = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt     : null;
 
+        // Concurrency guard: if another invocation wrote lastHeartbeatAt in the last 60s, skip.
+        // This is tighter than the scheduler interval to only block true duplicates.
         if (lastHeartbeatAt) {
-          const elapsedMs  = Date.now() - lastHeartbeatAt.toDate().getTime();
-          const intervalMs = heartbeatInterval * 60 * 1000;
-          if (elapsedMs < intervalMs) {
-            logger.info("Heartbeat: skipping — interval not elapsed", { elapsedMinutes: Math.round(elapsedMs / 60000) });
-            return res.json({ ok: true, message: "Skipped — interval not elapsed" });
+          const elapsedMs = Date.now() - lastHeartbeatAt.toDate().getTime();
+          if (elapsedMs < 60 * 1000) {
+            logger.info("Heartbeat: skipping — duplicate invocation within 60s");
+            return res.json({ ok: true, message: "Skipped — duplicate invocation" });
           }
         }
 
-        // Record this run immediately to prevent concurrent invocations
+        // Claim this run
         await db.collection("config").doc("settings").set(
           { lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp() },
           { merge: true }
