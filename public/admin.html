@@ -516,6 +516,15 @@
     </div>
     <div class="threshold-hint">Max reports per user per hour (1–60)</div>
   </div>
+  <div class="threshold-card" style="min-width:320px;max-width:480px">
+    <div class="label">🔑 GitHub PAT <span id="patStatus" style="font-size:11px;margin-left:6px;color:var(--text-dim)">checking...</span></div>
+    <div class="threshold-row" style="gap:6px">
+      <input type="password" id="patInput" placeholder="github_pat_..." autocomplete="off"
+        style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font-size:12px;font-family:monospace" />
+      <button class="btn-save-threshold" onclick="saveGithubPat()">Save</button>
+    </div>
+    <div class="threshold-hint">Required for Promote to Stable. Stored server-side only — never exposed to users.</div>
+  </div>
 </div>
 
 <div class="toolbar" style="margin-top:14px">
@@ -629,6 +638,54 @@
     const savedRateLimit = localStorage.getItem("autopilot_rate_limit");
     if (savedRateLimit) document.getElementById("rateLimitInput").value = savedRateLimit;
     return val;
+  }
+
+  async function saveGithubPat() {
+    const pat = document.getElementById("patInput").value.trim();
+    if (!pat.startsWith("github_")) {
+      alert("Invalid PAT — must start with 'github_'.");
+      return;
+    }
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+    try {
+      const r = await fetch(`${BASE}/counter?action=saveGithubPat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pat })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      document.getElementById("patStatus").textContent = "✓ configured";
+      document.getElementById("patStatus").style.color = "var(--green)";
+      document.getElementById("patInput").value = "";
+      alert("PAT saved. Promote to Stable is now fully enabled.");
+    } catch (e) {
+      alert("Failed to save PAT: " + e.message);
+    }
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
+
+  async function checkGithubPat() {
+    try {
+      const r = await fetch(`${BASE}/counter?action=checkGithubPat`);
+      const data = await r.json();
+      const el = document.getElementById("patStatus");
+      if (data.configured) {
+        const ago = data.updatedAt
+          ? `updated ${new Date(data.updatedAt).toLocaleDateString()}`
+          : "configured";
+        el.textContent = `✓ ${ago}`;
+        el.style.color = "var(--green)";
+      } else {
+        el.textContent = "⚠ not set — Promote to Stable disabled";
+        el.style.color = "var(--gold)";
+      }
+    } catch (e) {
+      document.getElementById("patStatus").textContent = "error checking";
+    }
   }
 
   function saveRateLimit() {
@@ -1183,9 +1240,9 @@
     loadThreshold();
     if (await checkAuth()) {
       loadLogs();
-      loadFeedback();          // load counts immediately on page open
+      loadFeedback();
+      checkGithubPat();
       syncBetaState();
-      // Poll every 15s: refresh both beta state AND feedback counts so nothing goes stale
       setInterval(async () => {
         await syncBetaState();
         await loadFeedback();
