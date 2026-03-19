@@ -1198,20 +1198,32 @@
     if (!confirm("Promote beta to stable? This will push the beta HTML to GitHub and trigger a live deploy (~2 min).")) return;
     const btn = document.getElementById("btnPromote");
     btn.disabled = true;
-    btn.innerHTML = `<span class="spinner"></span> Pushing to GitHub...`;
+    btn.innerHTML = `<span class="spinner"></span> Promoting...`;
     document.getElementById("autopilotStatus").textContent = "Pushing beta to GitHub — CI/CD will deploy to live site in ~2 minutes...";
+
+    // Safety net: always re-enable after 15s so UI never stays stuck
+    const safetyTimer = setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = "Promote to Stable";
+    }, 15000);
+
     try {
       const r = await fetch(`${BASE}/counter?action=promoteBeta`, { method: "POST" });
       const data = await r.json().catch(() => ({}));
+      clearTimeout(safetyTimer);
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      const sha = data.commitSha ? data.commitSha.substring(0, 7) : "?";
+      const sha = data.commitSha && data.commitSha !== "unknown" ? data.commitSha.substring(0, 7) : null;
+      const shaText = sha ? ` (commit ${sha})` : "";
       document.getElementById("autopilotStatus").textContent =
-        `✓ Pushed to GitHub (commit ${sha}) — live site deploying now via CI/CD (~2 min). Beta remains available until cleared.`;
+        `Pushed to GitHub${shaText} — live site deploying via CI/CD (~2 min). Beta remains available until cleared.`;
+      btn.disabled = false;
+      btn.innerHTML = "Promote to Stable";
       await syncBetaState();
     } catch (e) {
+      clearTimeout(safetyTimer);
       alert("Promote failed: " + e.message);
       btn.disabled = false;
-      btn.innerHTML = "✓ Promote to Stable";
+      btn.innerHTML = "Promote to Stable";
       document.getElementById("autopilotStatus").textContent = "Promote failed: " + e.message;
     }
   }
