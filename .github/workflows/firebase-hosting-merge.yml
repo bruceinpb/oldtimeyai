@@ -31,6 +31,24 @@ jobs:
           gcloud run services delete autopilotheartbeat \
             --region=us-central1 --quiet 2>/dev/null || true
           echo "Cloud Run service cleanup complete"
+      - name: Sync GITHUB_PAT into Firebase Secret Manager
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
+          GITHUB_PAT_FOR_PROMOTE: ${{ secrets.GITHUB_PAT_FOR_PROMOTE }}
+        run: |
+          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
+          gcloud auth activate-service-account --key-file=/tmp/sa_key.json
+          gcloud config set project oldtimeyai-928be
+          if [ -z "${GITHUB_PAT_FOR_PROMOTE}" ]; then
+            echo "GITHUB_PAT_FOR_PROMOTE secret not set — skipping"
+          else
+            # Create secret if it doesn't exist, then add a new version
+            gcloud secrets describe GITHUB_PAT --project=oldtimeyai-928be --quiet 2>/dev/null || \
+              gcloud secrets create GITHUB_PAT --replication-policy=automatic --project=oldtimeyai-928be
+            echo -n "${GITHUB_PAT_FOR_PROMOTE}" | \
+              gcloud secrets versions add GITHUB_PAT --data-file=- --project=oldtimeyai-928be
+            echo "GITHUB_PAT secret synced to Firebase Secret Manager"
+          fi
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
@@ -75,3 +93,4 @@ jobs:
               --quiet
           fi
           echo "Scheduler job configured with 540s deadline."
+
