@@ -516,6 +516,15 @@
     </div>
     <div class="threshold-hint">Max reports per user per hour (1–60)</div>
   </div>
+  <div class="threshold-card">
+    <div class="label">🚀 Auto-Promote After</div>
+    <div class="threshold-row">
+      <input type="number" class="threshold-input" id="autoPromoteInput" min="5" max="43200" value="1440" style="width:72px" />
+      <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">min</span>
+      <button class="btn-save-threshold" onclick="saveAutoPromote()">Save</button>
+    </div>
+    <div class="threshold-hint">Beta auto-promotes to stable after this many minutes (1440 = 24h, 0 = manual only)</div>
+  </div>
 
 </div>
 
@@ -608,6 +617,9 @@
           document.getElementById("heartbeatInput").value = data.heartbeatInterval;
           localStorage.setItem("autopilot_heartbeat_interval", data.heartbeatInterval);
         }
+        if (data.autoPromoteMinutes) {
+          document.getElementById("autoPromoteInput").value = data.autoPromoteMinutes;
+        }
         if (data.rateLimit) {
           document.getElementById("rateLimitInput").value = data.rateLimit;
           localStorage.setItem("autopilot_rate_limit", data.rateLimit);
@@ -674,6 +686,21 @@
       setTimeout(() => btn.textContent = "Save", 1500);
     })
     .catch(e => alert("Save failed: " + e.message));
+  }
+
+  function saveAutoPromote() {
+    const val = parseInt(document.getElementById("autoPromoteInput").value);
+    if (isNaN(val) || val < 5 || val > 43200) {
+      alert("Auto-promote must be 5–43200 minutes.");
+      return;
+    }
+    fetch(`${BASE}/counter?action=saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoPromoteMinutes: val })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) alert("Failed: " + d.error);
+    }).catch(e => alert("Error: " + e.message));
   }
 
   function saveThreshold() {
@@ -977,23 +1004,47 @@
         setTimeout(() => runAnalysis(queue.type), 300);
 
       } else if (_betaIsLive) {
-        const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
-        const trigger = data.autoTriggered ? "auto-triggered" : "manually generated";
+        const ts = data.updatedAt
+          ? new Date(data.updatedAt).toLocaleString()
+          : (data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time");
+        const layers = data.patchLayers || 1;
+        const bugs = data.bugCount || 0;
+        const features = data.featureCount || 0;
+        const parts = [];
+        if (bugs)     parts.push(`${bugs} bug${bugs>1?"s":""}`);
+        if (features) parts.push(`${features} feature${features>1?"s":""}`);
+        const desc = parts.length ? parts.join(" + ") : `${data.reportCount||"?"} reports`;
+        const autoPromoteMin = parseInt(document.getElementById("autoPromoteInput")?.value) || 1440;
 
-        // If a fresh analysis is pending (user just ran Analyze), don't stomp the
-        // diagnosis box or hide the Publish button — the poll must not clobber in-flight work.
         if (_pendingHtml) {
-          // Keep Publish button visible and diagnosis showing the NEW analysis
           document.getElementById("btnPublish").style.display = "inline-flex";
-          // Status line shows both: existing beta + new fix ready
           document.getElementById("autopilotStatus").textContent =
-            `New fix ready to publish — beta currently live (${data.type}, ${ts}). Click "Publish Beta" to replace it.`;
+            `New fix ready to publish — beta currently live (${layers} layer${layers>1?"s":""}). Click "Publish Beta" to add this layer.`;
         } else {
-          document.getElementById("autopilotStatus").textContent =
-            `Beta version live (${trigger}) — generated ${ts} from ${data.reportCount || "?"} ${data.type || ""} reports. Status: ${data.status}.`;
+          const layerText = layers > 1 ? ` — ${layers} patch layers stacked` : "";
+          document.getElementById("autopilotStatus").innerHTML =
+            `Beta live — <strong>${desc}</strong> addressed at ${ts}${layerText}. ` +
+            `Auto-promotes to stable in ${autoPromoteMin} min if not acted on.`;
           if (data.diagnosis) {
             document.getElementById("diagnosisBox").textContent = data.diagnosis;
             document.getElementById("diagnosisWrap").style.display = "block";
+          }
+          // Show chain history if multiple layers
+          const chain = data.betaChain || [];
+          if (chain.length > 1) {
+            const chainHtml = chain.map((c, i) =>
+              `<div style="margin-bottom:6px;padding:6px 8px;background:var(--surface);border-radius:4px;font-size:11px">
+                <strong>Layer ${i+1}</strong> (${c.bugCount||0} bugs, ${c.featureCount||0} features) — ${c.diagnosis ? c.diagnosis.substring(0,120)+"…" : "no diagnosis"}
+              </div>`
+            ).join("");
+            let chainBox = document.getElementById("betaChainBox");
+            if (!chainBox) {
+              chainBox = document.createElement("div");
+              chainBox.id = "betaChainBox";
+              chainBox.style.cssText = "margin-top:10px;font-size:12px;color:var(--text-dim)";
+              document.getElementById("diagnosisWrap").appendChild(chainBox);
+            }
+            chainBox.innerHTML = `<div style="margin-bottom:4px;font-weight:600;color:var(--gold)">📚 ${chain.length} Stacked Patch Layers:</div>` + chainHtml;
           }
         }
 
