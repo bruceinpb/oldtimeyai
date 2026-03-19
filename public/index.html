@@ -2194,6 +2194,9 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
 
         // ── New Version Modal ──────────────────────────────────────────────
         function showNewVersionModal(data) {
+            const overlay = document.getElementById('newVersionOverlay');
+            if (!overlay) return; // safety check
+
             const bugs     = data.bugCount     || 0;
             const features = data.featureCount || 0;
             const layers   = data.patchLayers  || 1;
@@ -2203,19 +2206,19 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             const desc = parts.length ? parts.join(' and ') : 'improvements made';
             const layerNote = layers > 1 ? ` (${layers} patch layers stacked)` : '';
 
-            document.getElementById('nvmDesc').innerHTML =
+            const descEl = document.getElementById('nvmDesc');
+            if (descEl) descEl.innerHTML =
                 `AutoPilot has prepared an update: <strong>${desc}</strong>${layerNote}.`;
 
-            // Update accept button label based on whether user is on stable or beta
+            // Update accept button label based on current page version
             const isBeta = sessionStorage.getItem('using_beta') === 'true';
             const acceptBtn = document.getElementById('nvmAcceptBtn');
-            if (isBeta) {
-                acceptBtn.textContent = '⚗ Load Latest Beta';
-            } else {
-                acceptBtn.textContent = '⚗ Try New Beta Version';
-            }
+            if (acceptBtn) acceptBtn.textContent = isBeta ? '⚗ Load Latest Beta' : '⚗ Try New Beta Version';
 
-            document.getElementById('newVersionOverlay').classList.add('active');
+            // Attach overlay background-click dismiss (fresh each time, avoids stale DOM refs)
+            overlay.onclick = function(e) { if (e.target === overlay) nvmDismiss(); };
+
+            overlay.classList.add('active');
         }
 
         function nvmDismiss() {
@@ -2231,11 +2234,6 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             document.getElementById('newVersionOverlay').classList.remove('active');
             await applyBetaVersion();
         }
-
-        // Close modal on overlay background click
-        document.getElementById('newVersionOverlay').addEventListener('click', function(e) {
-            if (e.target === this) nvmDismiss();
-        });
 
         // ── Beta status poller ─────────────────────────────────────────────
         async function checkBetaStatus() {
@@ -2333,29 +2331,15 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
   ">✕ Return to Stable</button>
 </div>
 <div style="height:44px"></div>`;
-            // Inject a poller-start script so even the beta page detects newer betas
-            const scriptOpen  = '<' + 'script>';
-            const scriptClose = '</' + 'script>';
-            const pollerPatch = scriptOpen +
-                'window.addEventListener("load",function(){' +
-                'if(typeof checkBetaStatus==="function"){' +
-                'checkBetaStatus();' +
-                '_betaPollerInterval=setInterval(checkBetaStatus,60000);' +
-                '}});' +
-                scriptClose;
-            return html.replace(/<body[^>]*>/, (match) => match + banner)
-                       .replace('</body>', pollerPatch + '</body>');
+            return html.replace(/<body[^>]*>/, (match) => match + banner);
         }
 
         // ── Init ───────────────────────────────────────────────────────────
-        if (_isBetaSession) {
-            // Already in beta — reload the latest beta (picks up any new layers)
-            applyBetaVersion();
-        } else {
-            // Start poller — check immediately then every 60s
-            checkBetaStatus();
-            _betaPollerInterval = setInterval(checkBetaStatus, 60 * 1000);
-        }
+        // Always start the poller regardless of which version is loaded.
+        // The poller detects new betas and shows the modal on BOTH stable and beta pages.
+        // _isBetaSession just affects the accept button label (already handled in showNewVersionModal).
+        checkBetaStatus();
+        _betaPollerInterval = setInterval(checkBetaStatus, 60 * 1000);
 
         // Close feedback modal on overlay click
         document.getElementById('feedbackOverlay').addEventListener('click', function(e) {
