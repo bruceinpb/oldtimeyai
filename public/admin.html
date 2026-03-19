@@ -1134,19 +1134,6 @@
         _pendingDiagnosis = data.diagnosis;
         document.getElementById("btnPublish").style.display = "inline-flex";
 
-      } else if (queue.queued && !_betaIsLive && !isPendingReview) {
-        // Auto-trigger queued — admin panel picks it up and runs analysis
-        const ts = queue.queuedAt ? new Date(queue.queuedAt).toLocaleString() : "just now";
-        document.getElementById("autopilotStatus").innerHTML =
-          `<strong style="color:var(--gold)">🤖 AutoPilot threshold crossed!</strong> ` +
-          `${queue.reportCount} ${queue.type} report(s) queued at ${ts}. ` +
-          `<span class="spinner"></span> Running analysis automatically...`;
-        document.getElementById("diagnosisWrap").style.display = "none";
-        // Clear queue doc then run analysis
-        await fetch(`${BASE}/counter?action=clearQueue`, { method: "POST" });
-        // Small delay to let the UI paint, then fire
-        setTimeout(() => runAnalysis(queue.type), 300);
-
       } else if (_betaIsLive) {
         const ts = data.updatedAt
           ? new Date(data.updatedAt).toLocaleString()
@@ -1220,7 +1207,8 @@
       || (bugs >= threshold ? "bug" : features >= threshold ? "feature" : null);
 
     if (!analyzeType) {
-      alert(`Neither bugs (${bugs}) nor features (${features}) have reached the threshold of ${threshold} yet.\n\nYou can lower the threshold or submit more reports.`);
+      document.getElementById("autopilotStatus").textContent =
+        `Threshold not yet reached — bugs: ${bugs}, features: ${features}, threshold: ${threshold}.`;
       return;
     }
 
@@ -1237,7 +1225,6 @@
       // Collect pending reports of the triggering type
       const reports = allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
       if (reports.length === 0) {
-        alert("No pending reports of the threshold type. Mark some as pending first.");
         btn.disabled = false;
         btn.innerHTML = "🤖 Analyze Reports &amp; Generate Fix";
         document.getElementById("autopilotStatus").textContent = "No pending reports found to analyze.";
@@ -1280,8 +1267,7 @@
 
   // ── AutoPilot: publish beta ───────────────────────────────────────────────
   async function publishBeta() {
-    if (!_pendingHtml) { alert("No generated HTML to publish. Run analysis first."); return; }
-    if (!confirm("Publish this as the beta version? Users who click 'Use Beta Version' will see it immediately.")) return;
+    if (!_pendingHtml) { document.getElementById("autopilotStatus").textContent = "No generated HTML to publish. Run analysis first."; return; }
 
     const btn = document.getElementById("btnPublish");
     btn.disabled = true;
@@ -1334,7 +1320,7 @@
 
   // ── AutoPilot: promote beta to stable ────────────────────────────────────
   async function promoteBeta() {
-    if (!confirm("Promote beta to stable? This will push the beta HTML to GitHub and trigger a live deploy (~2 min).")) return;
+    // Promote without confirmation — autonomous system
     const btn = document.getElementById("btnPromote");
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner"></span> Promoting...`;
@@ -1369,7 +1355,7 @@
 
   // ── AutoPilot: clear/revert beta ─────────────────────────────────────────
   async function clearBeta() {
-    if (!confirm("Remove the beta version? The 'Use Beta Version' button will grey out on the site immediately.")) return;
+    // Revert without confirmation
     const btn = document.getElementById("btnRevert");
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner"></span> Reverting...`;
@@ -1467,8 +1453,7 @@
   }
 
   async function resolveBugReview(action) {
-    const label = action === "rollback" ? "Roll back to the previous stable version? This will push the previous stable HTML to GitHub immediately." : "Approve the beta and close this review?";
-    if (!confirm(label)) return;
+    // Resolve without confirmation — admin clicked the button intentionally
     try {
       const r = await fetch(`${BASE}/counter?action=resolveBugReview`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1477,7 +1462,8 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
       if (action === "rollback") {
-        alert("Rollback pushed to GitHub. CI/CD will deploy the previous stable version in ~2 minutes.");
+        document.getElementById("bugReviewStatus").textContent =
+          "Rollback pushed to GitHub — CI/CD deploying previous stable version (~2 min).";
       }
       await loadBugReviewQueue();
       await syncBetaState();
