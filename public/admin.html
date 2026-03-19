@@ -945,7 +945,8 @@
       document.getElementById("betaLiveBadge").style.display = _betaIsLive ? "inline-flex" : "none";
       document.getElementById("btnRevert").style.display  = data.exists  ? "inline-flex" : "none";
       document.getElementById("btnPromote").style.display = _betaIsLive  ? "inline-flex" : "none";
-      document.getElementById("btnPublish").style.display = "none";
+      // Only hide Publish if there's no pending analysis — the poll must not clobber in-flight work
+      if (!_pendingHtml) document.getElementById("btnPublish").style.display = "none";
 
       if (isPendingReview) {
         const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
@@ -975,11 +976,22 @@
       } else if (_betaIsLive) {
         const ts = data.createdAt ? new Date(data.createdAt).toLocaleString() : "unknown time";
         const trigger = data.autoTriggered ? "auto-triggered" : "manually generated";
-        document.getElementById("autopilotStatus").textContent =
-          `Beta version live (${trigger}) — generated ${ts} from ${data.reportCount || "?"} ${data.type || ""} reports. Status: ${data.status}.`;
-        if (data.diagnosis) {
-          document.getElementById("diagnosisBox").textContent = data.diagnosis;
-          document.getElementById("diagnosisWrap").style.display = "block";
+
+        // If a fresh analysis is pending (user just ran Analyze), don't stomp the
+        // diagnosis box or hide the Publish button — the poll must not clobber in-flight work.
+        if (_pendingHtml) {
+          // Keep Publish button visible and diagnosis showing the NEW analysis
+          document.getElementById("btnPublish").style.display = "inline-flex";
+          // Status line shows both: existing beta + new fix ready
+          document.getElementById("autopilotStatus").textContent =
+            `New fix ready to publish — beta currently live (${data.type}, ${ts}). Click "Publish Beta" to replace it.`;
+        } else {
+          document.getElementById("autopilotStatus").textContent =
+            `Beta version live (${trigger}) — generated ${ts} from ${data.reportCount || "?"} ${data.type || ""} reports. Status: ${data.status}.`;
+          if (data.diagnosis) {
+            document.getElementById("diagnosisBox").textContent = data.diagnosis;
+            document.getElementById("diagnosisWrap").style.display = "block";
+          }
         }
 
       } else {
