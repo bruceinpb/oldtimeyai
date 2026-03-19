@@ -526,6 +526,15 @@
     </div>
     <div class="threshold-hint">Beta auto-promotes to stable after this many minutes (1440 = 24h, 0 = manual only)</div>
   </div>
+  <div class="threshold-card" id="countdownCard" style="min-width:200px;display:none">
+    <div class="label">⏳ NEXT AUTO-PROMOTE</div>
+    <div id="countdownDisplay" style="
+      font-size:28px;font-weight:700;font-family:'Special Elite',monospace;
+      color:var(--gold);letter-spacing:.04em;margin:6px 0 2px;
+      text-shadow:0 0 10px rgba(212,160,23,0.4);
+    ">--:--:--</div>
+    <div id="countdownSub" class="threshold-hint" style="margin-top:2px">until auto-promote to stable</div>
+  </div>
 
 </div>
 
@@ -702,6 +711,74 @@
     }).then(r => r.json()).then(d => {
       if (!d.ok) alert("Failed: " + d.error);
     }).catch(e => alert("Error: " + e.message));
+  }
+
+  // ── Auto-Promote Countdown Timer ─────────────────────────────────────────
+  let _countdownInterval = null;
+
+  function startCountdown(betaCreatedAt, autoPromoteMinutes) {
+    const card = document.getElementById("countdownCard");
+    const display = document.getElementById("countdownDisplay");
+    const sub = document.getElementById("countdownSub");
+
+    // Clear any existing countdown
+    if (_countdownInterval) clearInterval(_countdownInterval);
+
+    if (!betaCreatedAt || !autoPromoteMinutes || autoPromoteMinutes <= 0) {
+      card.style.display = "none";
+      return;
+    }
+
+    const promoteAt = new Date(betaCreatedAt).getTime() + (autoPromoteMinutes * 60 * 1000);
+    card.style.display = "flex";
+    card.style.flexDirection = "column";
+
+    function tick() {
+      const remaining = promoteAt - Date.now();
+      if (remaining <= 0) {
+        display.textContent = "Now!";
+        display.style.color = "var(--green)";
+        sub.textContent = "auto-promote firing…";
+        clearInterval(_countdownInterval);
+        // Refresh beta state after a moment
+        setTimeout(syncBetaState, 3000);
+        return;
+      }
+
+      const totalSec = Math.floor(remaining / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+
+      if (h > 0) {
+        display.textContent = `${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
+      } else {
+        display.textContent = `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+      }
+
+      // Color shift as deadline approaches
+      if (remaining < 60000) {         // < 1 min
+        display.style.color = "var(--red, #f07070)";
+      } else if (remaining < 300000) { // < 5 min
+        display.style.color = "var(--gold)";
+        display.style.animation = "pulse 1s ease-in-out infinite";
+      } else {
+        display.style.color = "var(--gold)";
+        display.style.animation = "";
+      }
+
+      const promoteDate = new Date(promoteAt);
+      sub.textContent = `auto-promotes at ${promoteDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;
+    }
+
+    tick();
+    _countdownInterval = setInterval(tick, 1000);
+  }
+
+  function stopCountdown() {
+    if (_countdownInterval) clearInterval(_countdownInterval);
+    const card = document.getElementById("countdownCard");
+    if (card) card.style.display = "none";
   }
 
   function saveThreshold() {
@@ -1022,11 +1099,15 @@
           document.getElementById("btnPublish").style.display = "inline-flex";
           document.getElementById("autopilotStatus").textContent =
             `New fix ready to publish — beta currently live (${layers} layer${layers>1?"s":""}). Click "Publish Beta" to add this layer.`;
+          // Start countdown from beta creation/update time
+          startCountdown(data.updatedAt || data.createdAt, autoPromoteMin);
         } else {
           const layerText = layers > 1 ? ` — ${layers} patch layers stacked` : "";
           document.getElementById("autopilotStatus").innerHTML =
             `Beta live — <strong>${desc}</strong> addressed at ${ts}${layerText}. ` +
             `Auto-promotes to stable in ${autoPromoteMin} min if not acted on.`;
+          // Start live countdown
+          startCountdown(data.updatedAt || data.createdAt, autoPromoteMin);
           if (data.diagnosis) {
             document.getElementById("diagnosisBox").textContent = data.diagnosis;
             document.getElementById("diagnosisWrap").style.display = "block";
@@ -1056,6 +1137,7 @@
         document.getElementById("diagnosisWrap").style.display = "none";
         _pendingHtml = null;
         _pendingDiagnosis = null;
+        stopCountdown();
       }
     } catch (e) {
       console.warn("syncBetaState error:", e.message);
