@@ -13,32 +13,40 @@ const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
 // ── AutoPilot: shared prompt builder and patch applier ────────────────────────
 function buildAutoPilotPrompt(reports, type, currentHtml) {
+  const bugReports     = reports.filter(r => r.type === "bug");
+  const featureReports = reports.filter(r => r.type === "feature");
+
   const reportsText = reports.map((r, i) =>
-    `Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
+    `[${r.type.toUpperCase()}] Report ${i + 1} (${r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "unknown"}): ${r.text}`
   ).join("\n");
+
+  const summary = [
+    bugReports.length     ? `${bugReports.length} bug report(s)`     : null,
+    featureReports.length ? `${featureReports.length} feature request(s)` : null
+  ].filter(Boolean).join(" and ");
 
   return `You are an expert web developer maintaining OldTimeyAI (oldtimeyai.com), a steampunk-themed historical AI chat website.
 
-The AutoPilot system has detected that ${reports.length} user ${type} report(s) have crossed the action threshold.
+The AutoPilot system has collected ${summary} that need to be addressed.
 
-USER REPORTS (${type}s):
+ALL USER REPORTS:
 ${reportsText}
 
-CURRENT index.html (${currentHtml.length} bytes):
+CURRENT HTML (${currentHtml.length} bytes) — this may already include previous AutoPilot patches:
 ${currentHtml}
 
 YOUR TASK:
-1. Read all reports carefully and group similar ones
-2. Diagnose the root cause(s)
-3. Implement the fixes/features in the HTML
+1. Read ALL reports carefully — address bugs AND features in a single pass
+2. Group similar reports, diagnose root causes
+3. Implement ALL fixes and features as patches to the HTML
 
 RESPONSE FORMAT — you MUST use exactly this format:
 
 DIAGNOSIS:
-[2-5 sentences explaining what you found and what you changed]
+[3-6 sentences covering all bugs fixed and features added]
 
 PATCHES:
-[One or more patches in this exact format — repeat as needed:]
+[One or more patches — repeat as needed:]
 <<<FIND>>>
 [exact text from the current HTML to find — minimum 3 unique lines]
 <<<REPLACE>>>
@@ -46,11 +54,13 @@ PATCHES:
 <<<END>>>
 
 RULES:
+- Address EVERY report — bugs and features together in one response
 - Each FIND block must be UNIQUE in the HTML — include enough context lines
-- Do NOT return the full HTML file — only the changed sections as patches
+- Do NOT return the full HTML file — only changed sections as patches
 - Do NOT use markdown code fences
 - Each patch replaces exactly the FIND text with the REPLACE text
-- If adding something new, include the surrounding anchor lines in FIND`;
+- If adding something new, include the surrounding anchor lines in FIND
+- The HTML you receive may already have previous patches applied — work with what is there`;
 }
 
 function applyPatches(html, fullResponse) {
@@ -552,11 +562,12 @@ exports.counter = onRequest(
     if (req.method === "GET" && req.query.action === "getSettings") {
       try {
         const doc = await db.collection("config").doc("settings").get();
-        const threshold          = doc.exists ? (doc.data().threshold          || 5)  : 5;
-        const heartbeatInterval  = doc.exists ? (doc.data().heartbeatInterval  || 5)  : 5;
-        const rateLimit          = doc.exists ? (doc.data().rateLimit          || 3)  : 3;
-        const lastHeartbeatAt    = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
-        return res.json({ threshold, heartbeatInterval, rateLimit, lastHeartbeatAt });
+        const threshold           = doc.exists ? (doc.data().threshold           || 5)    : 5;
+        const heartbeatInterval   = doc.exists ? (doc.data().heartbeatInterval   || 5)    : 5;
+        const rateLimit           = doc.exists ? (doc.data().rateLimit           || 3)    : 3;
+        const autoPromoteMinutes  = doc.exists ? (doc.data().autoPromoteMinutes  || 1440) : 1440;
+        const lastHeartbeatAt     = doc.exists ? (doc.data().lastHeartbeatAt?.toDate?.()?.toISOString() || null) : null;
+        return res.json({ threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, lastHeartbeatAt });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -565,7 +576,7 @@ exports.counter = onRequest(
     // ── Settings: POST /counter?action=saveSettings ───────────────────────────
     if (req.method === "POST" && req.query.action === "saveSettings") {
       try {
-        const { threshold, heartbeatInterval, rateLimit, resetHeartbeat } = req.body || {};
+        const { threshold, heartbeatInterval, rateLimit, autoPromoteMinutes, resetHeartbeat } = req.body || {};
         const updates = {};
         if (threshold !== undefined) {
           const val = parseInt(threshold);
@@ -582,6 +593,11 @@ exports.counter = onRequest(
           const val = parseInt(rateLimit);
           if (isNaN(val) || val < 1 || val > 60) return res.status(400).json({ error: "Rate limit must be 1–60 reports per hour." });
           updates.rateLimit = val;
+        }
+        if (autoPromoteMinutes !== undefined) {
+          const val = parseInt(autoPromoteMinutes);
+          if (isNaN(val) || val < 5 || val > 43200) return res.status(400).json({ error: "Auto-promote must be 5–43200 minutes." });
+          updates.autoPromoteMinutes = val;
         }
         if (resetHeartbeat === true) {
           // Reset the timer so the scheduler won't fire again until the next full interval
@@ -618,87 +634,125 @@ exports.counter = onRequest(
 
     // ── Heartbeat: POST /counter?action=heartbeat ────────────────────────────
     // Called by Cloud Scheduler every 5 minutes.
-    // Synchronous — awaits all work before responding so the Cloud Run
-    // container stays alive for the full Claude call (up to 540s timeout).
-    // Cloud Scheduler timeout is 10min, well within our function timeout.
+    // Collects ALL pending bugs+features, applies patches on top of current beta
+    // (or stable), marks all reports reviewed, and auto-promotes after threshold.
     if (req.method === "POST" && req.query.action === "heartbeat") {
-      logger.info("AutoPilot heartbeat firing via HTTP");
+      logger.info("AutoPilot heartbeat firing");
       try {
-        // ── 1. Read settings and enforce configurable interval ─────────────
+        // ── 1. Enforce configurable interval ────────────────────────────
         const settingsDoc = await db.collection("config").doc("settings").get();
-        const threshold         = settingsDoc.exists ? (settingsDoc.data().threshold         || 5) : 5;
-        const heartbeatInterval = settingsDoc.exists ? (settingsDoc.data().heartbeatInterval || 5) : 5;
-        const lastHeartbeatAt   = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt    : null;
+        const threshold          = settingsDoc.exists ? (settingsDoc.data().threshold          || 1)    : 1;
+        const heartbeatInterval  = settingsDoc.exists ? (settingsDoc.data().heartbeatInterval  || 5)    : 5;
+        const autoPromoteMinutes = settingsDoc.exists ? (settingsDoc.data().autoPromoteMinutes || 1440) : 1440;
+        const lastHeartbeatAt    = settingsDoc.exists ? settingsDoc.data().lastHeartbeatAt     : null;
 
         if (lastHeartbeatAt) {
           const elapsedMs  = Date.now() - lastHeartbeatAt.toDate().getTime();
           const intervalMs = heartbeatInterval * 60 * 1000;
           if (elapsedMs < intervalMs) {
-            logger.info("Heartbeat: skipping — interval not elapsed", {
-              heartbeatInterval,
-              elapsedMinutes: Math.round(elapsedMs / 60000)
-            });
+            logger.info("Heartbeat: skipping — interval not elapsed", { elapsedMinutes: Math.round(elapsedMs / 60000) });
             return res.json({ ok: true, message: "Skipped — interval not elapsed" });
           }
         }
 
-        // Record this run so concurrent invocations skip
+        // Record this run immediately to prevent concurrent invocations
         await db.collection("config").doc("settings").set(
           { lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp() },
           { merge: true }
         );
 
-        // ── 2. Skip if beta already exists ──────────────────────────────
-        const [betaDoc, queueDoc] = await Promise.all([
-          db.collection("config").doc("betaVersion").get(),
-          db.collection("config").doc("analysisQueue").get()
-        ]);
-        if (betaDoc.exists) {
-          const s = betaDoc.data().status;
-          if (s === "pending_review" || s === "published") {
-            logger.info("Heartbeat: beta already exists, skipping", { status: s });
-            return res.json({ ok: true, message: `Skipped — beta exists (${s})` });
+        // ── 2. Check auto-promote: if beta is older than autoPromoteMinutes, push to GitHub ──
+        const betaDoc = await db.collection("config").doc("betaVersion").get();
+        if (betaDoc.exists && (betaDoc.data().status === "published" || betaDoc.data().status === "pending_review")) {
+          const betaCreatedAt = betaDoc.data().createdAt?.toDate?.();
+          if (betaCreatedAt) {
+            const betaAgeMs = Date.now() - betaCreatedAt.getTime();
+            const autoPromoteMs = autoPromoteMinutes * 60 * 1000;
+            if (betaAgeMs >= autoPromoteMs) {
+              logger.info("Heartbeat: auto-promoting beta to stable", { ageMinutes: Math.round(betaAgeMs / 60000) });
+              try {
+                const secretsDoc = await db.collection("config").doc("secrets").get();
+                const pat = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+                if (pat) {
+                  const shaRes = await fetch(
+                    "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+                    { headers: { "Authorization": `token ${pat}`, "User-Agent": "OldTimeyAI-AutoPilot" } }
+                  );
+                  if (shaRes.ok) {
+                    const shaData = await shaRes.json();
+                    const betaHtml = betaDoc.data().html;
+                    const pushRes = await fetch(
+                      "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
+                      {
+                        method: "PUT",
+                        headers: { "Authorization": `token ${pat}`, "Content-Type": "application/json", "User-Agent": "OldTimeyAI-AutoPilot" },
+                        body: JSON.stringify({
+                          message: `auto-promote: AutoPilot beta → stable (${autoPromoteMinutes}min auto-promote)`,
+                          content: Buffer.from(betaHtml).toString("base64"),
+                          sha: shaData.sha
+                        })
+                      }
+                    );
+                    if (pushRes.ok) {
+                      const pushData = await pushRes.json();
+                      await db.collection("config").doc("betaVersion").update({
+                        status: "promoted",
+                        promotedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        autoPromoted: true,
+                        commitSha: pushData.commit?.sha || "unknown"
+                      });
+                      logger.info("Heartbeat: auto-promote SUCCESS");
+                    }
+                  }
+                }
+              } catch (promoteErr) {
+                logger.error("Heartbeat auto-promote failed", { message: promoteErr.message });
+              }
+              // Continue to check for new reports even after promoting
+            }
           }
         }
-        if (queueDoc.exists) {
-          await db.collection("config").doc("analysisQueue").delete();
-        }
 
-        // ── 3. Count pending reports ────────────────────────────────────
+        // ── 3. Collect ALL pending reports (bugs + features together) ───
         const allPendingSnap = await db.collection("feedbackReports")
           .where("status", "==", "pending")
           .get();
 
-        const bugReports = [], featureReports = [];
+        const allReports = [];
         allPendingSnap.forEach(doc => {
           const d = doc.data();
-          const r = { id: doc.id, text: d.text, type: d.type,
-            timestamp: d.timestamp?.toDate?.()?.toISOString() || null };
-          if (d.type === "bug")     bugReports.push(r);
-          if (d.type === "feature") featureReports.push(r);
+          allReports.push({ id: doc.id, text: d.text, type: d.type,
+            timestamp: d.timestamp?.toDate?.()?.toISOString() || null });
         });
 
-        logger.info("Heartbeat counts", { bugs: bugReports.length, features: featureReports.length, threshold });
+        const bugCount     = allReports.filter(r => r.type === "bug").length;
+        const featureCount = allReports.filter(r => r.type === "feature").length;
+        logger.info("Heartbeat counts", { bugs: bugCount, features: featureCount, threshold });
 
-        let triggerReports = null, triggerType = null;
-        if (bugReports.length >= threshold)          { triggerReports = bugReports;     triggerType = "bug"; }
-        else if (featureReports.length >= threshold) { triggerReports = featureReports; triggerType = "feature"; }
-
-        if (!triggerReports) {
+        // Trigger if EITHER type meets threshold
+        const shouldTrigger = bugCount >= threshold || featureCount >= threshold;
+        if (!shouldTrigger) {
           logger.info("Heartbeat: threshold not yet reached");
-          return res.json({ ok: true, message: "Threshold not yet reached", bugs: bugReports.length, features: featureReports.length, threshold });
+          return res.json({ ok: true, message: "Threshold not yet reached", bugs: bugCount, features: featureCount, threshold });
         }
 
-        // ── 4. Fetch index.html ──────────────────────────────────────────
-        logger.info("Heartbeat: threshold crossed — fetching index.html", { type: triggerType, count: triggerReports.length });
-        const siteRes = await fetch("https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html");
-        if (!siteRes.ok) throw new Error(`Could not fetch index.html: ${siteRes.status}`);
-        const currentHtml = await siteRes.text();
+        // ── 4. Fetch base HTML — use current beta if it exists, else stable ──
+        let baseHtml;
+        const freshBetaDoc = await db.collection("config").doc("betaVersion").get();
+        if (freshBetaDoc.exists && freshBetaDoc.data().html && freshBetaDoc.data().status !== "promoted") {
+          baseHtml = freshBetaDoc.data().html;
+          logger.info("Heartbeat: using current beta as base HTML", { length: baseHtml.length });
+        } else {
+          const siteRes = await fetch("https://raw.githubusercontent.com/bruceinpb/oldtimeyai/main/public/index.html");
+          if (!siteRes.ok) throw new Error(`Could not fetch index.html: ${siteRes.status}`);
+          baseHtml = await siteRes.text();
+          logger.info("Heartbeat: using stable GitHub HTML as base", { length: baseHtml.length });
+        }
 
-        // ── 5. Call Claude ───────────────────────────────────────────────
-        const prompt = buildAutoPilotPrompt(triggerReports, triggerType, currentHtml);
+        // ── 5. Call Claude with ALL reports ─────────────────────────────
+        const prompt = buildAutoPilotPrompt(allReports, "mixed", baseHtml);
+        logger.info("Heartbeat: calling Claude", { totalReports: allReports.length, bugs: bugCount, features: featureCount });
 
-        logger.info("Heartbeat: calling Claude", { type: triggerType, reports: triggerReports.length });
         const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -717,30 +771,59 @@ exports.counter = onRequest(
         const claudeData   = await claudeRes.json();
         const fullResponse = claudeData.content[0].text;
 
-        // ── 6. Parse patches and apply ───────────────────────────────────
+        // ── 6. Apply patches on top of base HTML ────────────────────────
         const diagMatch = fullResponse.match(/DIAGNOSIS:\s*([\s\S]*?)(?=\nPATCHES:)/i);
-        const diagnosis = diagMatch ? diagMatch[1].trim() : "AutoPilot heartbeat fix.";
+        const diagnosis = diagMatch ? diagMatch[1].trim() : "AutoPilot fix.";
 
         if (!fullResponse.includes("<<<FIND>>>")) throw new Error("Claude did not return patches in the expected format.");
 
-        const { patched: html, patchCount, errors: patchErrors } = applyPatches(currentHtml, fullResponse);
+        const { patched: html, patchCount, errors: patchErrors } = applyPatches(baseHtml, fullResponse);
         logger.info("Heartbeat patches applied", { patchCount, patchErrors: patchErrors.length });
 
+        // ── 7. Build chain history ───────────────────────────────────────
+        const existingChain = (freshBetaDoc.exists && freshBetaDoc.data().betaChain) ? freshBetaDoc.data().betaChain : [];
+        const newChainEntry = {
+          diagnosis,
+          bugCount,
+          featureCount,
+          reportCount: allReports.length,
+          appliedAt: new Date().toISOString()
+        };
+        const betaChain = [...existingChain, newChainEntry];
+
+        // ── 8. Save new beta (overwrites any existing) ───────────────────
         await db.collection("config").doc("betaVersion").set({
-          html, diagnosis, type: triggerType,
-          reportCount: triggerReports.length,
-          status: "published",   // published directly — fully autonomous, no admin approval needed
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          html,
+          diagnosis,
+          betaChain,
+          type: "mixed",
+          bugCount,
+          featureCount,
+          reportCount: allReports.length,
+          status: "published",
+          createdAt: freshBetaDoc.exists ? (freshBetaDoc.data().createdAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           promotedAt: null,
           autoTriggered: true,
-          triggeredBy: "heartbeat"
+          triggeredBy: "heartbeat",
+          patchLayers: betaChain.length
         });
-        await db.collection("config").doc("analysisQueue").delete().catch(() => {});
 
-        logger.info("Heartbeat: SUCCESS — beta published automatically", {
-          type: triggerType, reportCount: triggerReports.length, htmlLength: html.length
+        // ── 9. Mark ALL pending reports reviewed ─────────────────────────
+        const batch = db.batch();
+        allPendingSnap.forEach(doc => batch.update(doc.ref, { status: "reviewed" }));
+        await batch.commit();
+        logger.info("Heartbeat: marked all pending reports reviewed", { count: allReports.length });
+
+        logger.info("Heartbeat: SUCCESS", { totalReports: allReports.length, patchLayers: betaChain.length, patchCount });
+        return res.json({
+          ok: true,
+          message: `Beta updated (layer ${betaChain.length}) — ${allReports.length} reports addressed`,
+          bugs: bugCount,
+          features: featureCount,
+          patchLayers: betaChain.length,
+          patchCount
         });
-        return res.json({ ok: true, message: "Beta published automatically", type: triggerType, reportCount: triggerReports.length });
 
       } catch (err) {
         logger.error("Heartbeat error", { message: err.message, stack: err.stack });
