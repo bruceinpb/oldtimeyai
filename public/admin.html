@@ -615,8 +615,8 @@
     const saved = localStorage.getItem(THRESHOLD_KEY);
     const val = saved ? parseInt(saved) : 5;
     document.getElementById("thresholdInput").value = val;
-    // Pull threshold, heartbeat interval, and rate limit from Firestore
-    fetch(`${BASE}/counter?action=getSettings`)
+    // Pull settings from server — returns Promise so init can await it
+    return fetch(`${BASE}/counter?action=getSettings`)
       .then(r => r.json())
       .then(data => {
         if (data.threshold) {
@@ -629,6 +629,7 @@
         }
         if (data.autoPromoteMinutes) {
           document.getElementById("autoPromoteInput").value = data.autoPromoteMinutes;
+          _autoPromoteMinutes = data.autoPromoteMinutes;  // cache for countdown timer
         }
         if (data.rateLimit) {
           document.getElementById("rateLimitInput").value = data.rateLimit;
@@ -709,12 +710,17 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ autoPromoteMinutes: val })
     }).then(r => r.json()).then(d => {
-      if (!d.ok) alert("Failed: " + d.error);
+      if (d.ok) {
+        _autoPromoteMinutes = val;  // update cache immediately
+      } else {
+        alert("Failed: " + d.error);
+      }
     }).catch(e => alert("Error: " + e.message));
   }
 
   // ── Auto-Promote Countdown Timer ─────────────────────────────────────────
   let _countdownInterval = null;
+  let _autoPromoteMinutes = 1440;  // loaded from server — never read from DOM input
 
   function startCountdown(betaCreatedAt, autoPromoteMinutes) {
     const card = document.getElementById("countdownCard");
@@ -1101,7 +1107,7 @@
         if (bugs)     parts.push(`${bugs} bug${bugs>1?"s":""}`);
         if (features) parts.push(`${features} feature${features>1?"s":""}`);
         const desc = parts.length ? parts.join(" + ") : `${data.reportCount||"?"} reports`;
-        const autoPromoteMin = parseInt(document.getElementById("autoPromoteInput")?.value) || 1440;
+        const autoPromoteMin = _autoPromoteMinutes;  // use server-confirmed value, not DOM
 
         if (_pendingHtml) {
           document.getElementById("btnPublish").style.display = "inline-flex";
@@ -1338,10 +1344,11 @@
   }
 
   (async () => {
-    loadThreshold();
     if (await checkAuth()) {
       loadLogs();
       loadFeedback();
+      // Await settings so _autoPromoteMinutes is populated before syncBetaState runs countdown
+      await loadThreshold();
       syncBetaState();
       setInterval(async () => {
         await syncBetaState();
