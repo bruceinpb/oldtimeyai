@@ -1707,9 +1707,9 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
             // Current year for random range
             const currentYear = new Date().getFullYear();
             
-            // Final random values
-            const finalMonth = Math.floor(Math.random() * 12) + 1;
-            const finalDay = Math.floor(Math.random() * 28) + 1;
+            // Final values - always January 5th of a random year
+            const finalMonth = 1; // Always January
+            const finalDay = 5; // Always 5th
             const finalYear = Math.floor(Math.random() * (currentYear - 1)) + 1;
 
             // Add spinning class to all
