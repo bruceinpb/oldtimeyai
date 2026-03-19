@@ -1182,13 +1182,6 @@
     _pendingHtml = null;
     _pendingReports = null;
 
-    // Reset heartbeat timer immediately so the scheduler won't race while we work
-    fetch(`${BASE}/counter?action=saveSettings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resetHeartbeat: true })
-    }).catch(() => {});
-
     try {
       // Collect pending reports of the triggering type
       const reports = allFeedback.filter(r => r.type === analyzeType && r.status === "pending");
