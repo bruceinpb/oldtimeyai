@@ -60,7 +60,15 @@ RULES:
 - Do NOT use markdown code fences
 - Each patch replaces exactly the FIND text with the REPLACE text
 - If adding something new, include the surrounding anchor lines in FIND
-- The HTML you receive may already have previous patches applied — work with what is there`;
+- The HTML you receive may already have previous patches applied — work with what is there
+- CRITICAL FOR IMAGE URLS: NEVER guess or invent Unsplash photo IDs. They return 404.
+  For gallery card images, you MUST use ONLY these VERIFIED working URLs:
+  Medieval/Castle: https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=500&fit=crop
+  Ancient ruins:   https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop
+  Victorian city:  https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop
+  Medieval city:   https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop
+  Art/Picasso:     https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop
+  For ANY new image type, pick the closest match from the list above. Do NOT invent URLs.`;
 }
 
 function applyPatches(html, fullResponse) {
