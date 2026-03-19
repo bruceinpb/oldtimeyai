@@ -31,6 +31,23 @@ jobs:
           gcloud run services delete autopilotheartbeat \
             --region=us-central1 --quiet 2>/dev/null || true
           echo "Cloud Run service cleanup complete"
+      - name: Clear conflicting plain env vars from Cloud Run services
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
+        run: |
+          echo "${FIREBASE_SERVICE_ACCOUNT}" > /tmp/sa_key.json
+          gcloud auth activate-service-account --key-file=/tmp/sa_key.json
+          gcloud config set project oldtimeyai-928be
+          # Remove ANTHROPIC_API_KEY as a plain env var — it must only exist as a secret ref
+          # This fixes: "Secret env var overlaps non-secret env var: ANTHROPIC_API_KEY"
+          for SVC in counter chat events story; do
+            if gcloud run services describe $SVC --region=us-central1 --quiet 2>/dev/null; then
+              gcloud run services update $SVC \
+                --region=us-central1 \
+                --remove-env-vars=ANTHROPIC_API_KEY \
+                --quiet 2>/dev/null && echo "Cleared ANTHROPIC_API_KEY plain env from $SVC" || echo "$SVC: no plain env var to clear"
+            fi
+          done
       - name: Deploy Cloud Functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLDTIMEYAI_928BE }}
