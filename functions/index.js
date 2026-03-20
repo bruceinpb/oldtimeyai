@@ -61,15 +61,17 @@ RULES:
 - Each patch replaces exactly the FIND text with the REPLACE text
 - If adding something new, include the surrounding anchor lines in FIND
 - The HTML you receive may already have previous patches applied — work with what is there
-- CRITICAL FOR IMAGE URLS: NEVER guess or invent Unsplash photo IDs. They return 404.
-  For gallery card images, you MUST use ONLY these VERIFIED working URLs:
-  Medieval/Castle: https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=500&fit=crop
-  Ancient ruins:   https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&h=500&fit=crop
-  Victorian city:  https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop
-  Medieval city:   https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop
-  Art/Picasso:     https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop
-  Ford Model T:    https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop
-  For ANY new image type, pick the closest match from the list above. Do NOT invent URLs.
+- GALLERY CARD IMAGES: Gallery cards use local paths /gallery/card1.png through /gallery/card5.png.
+  NEVER use Unsplash URLs. NEVER invent any URL. NEVER change the src path of a gallery img tag.
+  When a report requests a gallery image change, do TWO things only:
+    1. Update the card-label text to match the requested subject
+    2. Add a GENERATE_IMAGE marker comment on the same line immediately after the img closing tag:
+       <!-- GENERATE_IMAGE:slot=N:detailed visual description for DALL-E -->
+  where N is the card number (1-5). The server reads this marker, calls DALL-E 3 automatically,
+  and commits the real image to /gallery/cardN.png. The img src always stays /gallery/cardN.png.
+  EXAMPLE — user asks "change card 5 to a Victorian steam train":
+    <img src="/gallery/card5.png" alt="Victorian Steam Train" onerror="this.onerror=null;this.src='https://picsum.photos/seed/fordt42/400/500'"><!-- GENERATE_IMAGE:slot=5:Victorian era steam locomotive at a station platform, coal smoke billowing, period passengers in top hats, sepia photograph style -->
+    <div class="card-label">Victorian Steam Train</div>
 - CRITICAL: NEVER modify the modal loop prevention logic. The following are protected:
   sessionStorage keys: 'beta_seen_at', '_stableLoad', 'using_beta'
   JS variables: _updateModalShown, _lastKnownBetaCreatedAt, _updateBetaData, _updateTimer
@@ -107,7 +109,261 @@ function applyPatches(html, fullResponse) {
 }
 
 
-// Visitor Counter + Admin Logs + Feedback endpoint
+// ── AutoPilot: DALL-E Gallery Image Generation + Atomic GitHub Commit ────────
+// Called by heartbeat, promoteBeta, and auto-promote whenever the patched HTML
+// contains <!-- GENERATE_IMAGE:slot=N:description --> markers.
+// Generates each requested image via DALL-E 3, then commits ALL images + HTML
+// in a single atomic Git commit via the GitHub Trees API (one CI/CD run, no races).
+//
+// Returns { commitSha, imagesGenerated, cleanHtml }
+//   commitSha      — the GitHub commit SHA, or null if no markers were found
+//   imagesGenerated — number of images successfully generated
+//   cleanHtml       — HTML with all GENERATE_IMAGE markers stripped out
+//                    (always safe to save to Firestore regardless of whether images fired)
+//
+async function generateAndCommitGalleryImages(html, pat, openAiKey, commitMessage) {
+
+  const DALLE_STYLE = "Vintage sepia-toned antique photograph, high contrast, aged paper texture, historically accurate, photorealistic: ";
+  const GH_OWNER    = "bruceinpb";
+  const GH_REPO     = "oldtimeyai";
+  const GH_HEADERS  = {
+    "Authorization": `token ${pat}`,
+    "Content-Type":  "application/json",
+    "User-Agent":    "OldTimeyAI-AutoPilot"
+  };
+
+  // ── Step 1: Extract GENERATE_IMAGE markers ────────────────────────────────
+  // Regex uses [\s\S]+? (lazy) so hyphens inside descriptions work fine.
+  // A naive [^-]+ would stop at the first hyphen in the description text.
+  const MARKER_RE = /<!--\s*GENERATE_IMAGE:slot=(\d):([\s\S]+?)-->/g;
+  const markers   = [];
+  let   m;
+  while ((m = MARKER_RE.exec(html)) !== null) {
+    markers.push({ slot: parseInt(m[1], 10), desc: m[2].trim(), fullMatch: m[0] });
+  }
+
+  // Always strip markers so cleanHtml is safe to save / show to users
+  let cleanHtml = html;
+  for (const marker of markers) {
+    cleanHtml = cleanHtml.replace(marker.fullMatch, "");
+  }
+
+  // If no markers or no OpenAI key, return immediately — caller handles the push
+  if (markers.length === 0) {
+    logger.info("generateAndCommitGalleryImages: no markers found — skipping image generation");
+    return { commitSha: null, imagesGenerated: 0, cleanHtml };
+  }
+  if (!openAiKey) {
+    logger.warn("generateAndCommitGalleryImages: markers found but no OpenAI key configured", {
+      slots: markers.map(mk => mk.slot)
+    });
+    return { commitSha: null, imagesGenerated: 0, cleanHtml };
+  }
+
+  logger.info("generateAndCommitGalleryImages: starting", {
+    count: markers.length, slots: markers.map(mk => mk.slot)
+  });
+
+  // ── Step 2: Call DALL-E 3 for each marker, create GitHub blob per image ───
+  const imageTreeEntries = [];
+
+  for (const marker of markers) {
+    const prompt = DALLE_STYLE + marker.desc;
+    logger.info(`DALL-E generating card ${marker.slot}`, { prompt: prompt.substring(0, 100) });
+
+    const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
+      method:  "POST",
+      headers: { "Authorization": `Bearer ${openAiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model:           "dall-e-3",
+        prompt:          prompt,
+        n:               1,
+        size:            "1024x1024",
+        response_format: "b64_json"     // permanent binary — no expiring Azure URLs
+      })
+    });
+    if (!dalleRes.ok) {
+      const errBody = await dalleRes.text();
+      throw new Error(`DALL-E error for slot ${marker.slot}: HTTP ${dalleRes.status} — ${errBody.substring(0, 200)}`);
+    }
+    const dalleData = await dalleRes.json();
+    if (!dalleData.data || !dalleData.data[0] || !dalleData.data[0].b64_json) {
+      throw new Error(`DALL-E returned unexpected structure for slot ${marker.slot}`);
+    }
+    const imgB64 = dalleData.data[0].b64_json;
+    logger.info(`DALL-E image received for card ${marker.slot}`, { b64Chars: imgB64.length });
+
+    // Upload image to GitHub as a blob
+    const blobRes = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/blobs`,
+      { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ content: imgB64, encoding: "base64" }) }
+    );
+    if (!blobRes.ok) {
+      throw new Error(`GitHub blob creation failed for slot ${marker.slot}: HTTP ${blobRes.status}`);
+    }
+    const blobData = await blobRes.json();
+    if (!blobData.sha) {
+      throw new Error(`GitHub blob returned no SHA for slot ${marker.slot}: ${JSON.stringify(blobData).substring(0, 200)}`);
+    }
+    logger.info(`GitHub blob created for card ${marker.slot}`, { sha: blobData.sha });
+    imageTreeEntries.push({
+      path: `public/gallery/card${marker.slot}.png`,
+      mode: "100644",
+      type: "blob",
+      sha:  blobData.sha
+    });
+  }
+
+  // ── Step 3: Create GitHub blob for the cleaned index.html ─────────────────
+  const htmlB64     = Buffer.from(cleanHtml).toString("base64");
+  const htmlBlobRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/blobs`,
+    { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ content: htmlB64, encoding: "base64" }) }
+  );
+  if (!htmlBlobRes.ok) {
+    throw new Error(`GitHub HTML blob creation failed: HTTP ${htmlBlobRes.status}`);
+  }
+  const htmlBlobData = await htmlBlobRes.json();
+  if (!htmlBlobData.sha) {
+    throw new Error(`GitHub HTML blob returned no SHA: ${JSON.stringify(htmlBlobData).substring(0, 200)}`);
+  }
+
+  // ── Step 4: Get current HEAD commit and tree ───────────────────────────────
+  const refsRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/refs/heads/main`,
+    { headers: GH_HEADERS }
+  );
+  if (!refsRes.ok) {
+    throw new Error(`GitHub refs fetch failed: HTTP ${refsRes.status}`);
+  }
+  const refsData = await refsRes.json();
+  if (!refsData.object || !refsData.object.sha) {
+    throw new Error(`GitHub refs returned unexpected structure: ${JSON.stringify(refsData).substring(0, 200)}`);
+  }
+  const headSha = refsData.object.sha;
+
+  const commitFetchRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/commits/${headSha}`,
+    { headers: GH_HEADERS }
+  );
+  if (!commitFetchRes.ok) {
+    throw new Error(`GitHub commit fetch failed: HTTP ${commitFetchRes.status}`);
+  }
+  const commitFetchData = await commitFetchRes.json();
+  if (!commitFetchData.tree || !commitFetchData.tree.sha) {
+    throw new Error(`GitHub commit returned no tree SHA: ${JSON.stringify(commitFetchData).substring(0, 200)}`);
+  }
+  const currentTreeSha = commitFetchData.tree.sha;
+
+  // ── Step 5: Create new Git tree (all images + index.html together) ─────────
+  const allTreeEntries = [
+    { path: "public/index.html", mode: "100644", type: "blob", sha: htmlBlobData.sha },
+    ...imageTreeEntries
+  ];
+  const newTreeRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/trees`,
+    { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ base_tree: currentTreeSha, tree: allTreeEntries }) }
+  );
+  if (!newTreeRes.ok) {
+    throw new Error(`GitHub tree creation failed: HTTP ${newTreeRes.status}`);
+  }
+  const newTreeData = await newTreeRes.json();
+  if (!newTreeData.sha) {
+    throw new Error(`GitHub tree returned no SHA: ${JSON.stringify(newTreeData).substring(0, 200)}`);
+  }
+  const newTreeSha = newTreeData.sha;
+
+  // ── Step 6: Create the commit ───────────────────────────────────────────────
+  const newCommitRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/commits`,
+    {
+      method:  "POST",
+      headers: GH_HEADERS,
+      body: JSON.stringify({
+        message: commitMessage || `autopilot: gallery image(s) + index.html (${markers.length} image(s))`,
+        tree:    newTreeSha,
+        parents: [headSha]
+      })
+    }
+  );
+  if (!newCommitRes.ok) {
+    throw new Error(`GitHub commit creation failed: HTTP ${newCommitRes.status}`);
+  }
+  const newCommitData = await newCommitRes.json();
+  if (!newCommitData.sha) {
+    throw new Error(`GitHub commit returned no SHA: ${JSON.stringify(newCommitData).substring(0, 200)}`);
+  }
+  const newCommitSha = newCommitData.sha;
+
+  // ── Step 7: Advance HEAD ref to the new commit ────────────────────────────
+  const refUpdateRes = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/refs/heads/main`,
+    { method: "PATCH", headers: GH_HEADERS, body: JSON.stringify({ sha: newCommitSha }) }
+  );
+  if (!refUpdateRes.ok) {
+    throw new Error(`GitHub ref update failed: HTTP ${refUpdateRes.status}`);
+  }
+
+  logger.info("generateAndCommitGalleryImages: SUCCESS", {
+    commitSha: newCommitSha,
+    imagesGenerated: markers.length,
+    paths: imageTreeEntries.map(e => e.path)
+  });
+
+  return { commitSha: newCommitSha, imagesGenerated: markers.length, cleanHtml };
+}
+
+
+// ── Internal helper: push index.html only via Git Trees API ──────────────────
+// Used when there are no GENERATE_IMAGE markers but we still need to push HTML.
+// Returns the new commit SHA.
+async function pushHtmlOnly(html, pat, commitMessage) {
+  const GH_OWNER   = "bruceinpb";
+  const GH_REPO    = "oldtimeyai";
+  const GH_HEADERS = {
+    "Authorization": `token ${pat}`,
+    "Content-Type":  "application/json",
+    "User-Agent":    "OldTimeyAI-AutoPilot"
+  };
+
+  // Create blob
+  const htmlB64     = Buffer.from(html).toString("base64");
+  const blobRes     = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/blobs`,
+    { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ content: htmlB64, encoding: "base64" }) }
+  );
+  if (!blobRes.ok) throw new Error(`pushHtmlOnly: blob failed HTTP ${blobRes.status}`);
+  const blobSha = (await blobRes.json()).sha;
+  if (!blobSha) throw new Error("pushHtmlOnly: blob returned no SHA");
+
+  // Get HEAD + tree
+  const refsData    = await (await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/refs/heads/main`, { headers: GH_HEADERS })).json();
+  const headSha     = refsData?.object?.sha;
+  if (!headSha) throw new Error("pushHtmlOnly: could not get HEAD SHA");
+
+  const commitData  = await (await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/commits/${headSha}`, { headers: GH_HEADERS })).json();
+  const treeSha     = commitData?.tree?.sha;
+  if (!treeSha) throw new Error("pushHtmlOnly: could not get tree SHA");
+
+  // New tree
+  const newTreeRes  = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/trees`, { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ base_tree: treeSha, tree: [{ path: "public/index.html", mode: "100644", type: "blob", sha: blobSha }] }) });
+  if (!newTreeRes.ok) throw new Error(`pushHtmlOnly: tree failed HTTP ${newTreeRes.status}`);
+  const newTreeSha  = (await newTreeRes.json()).sha;
+  if (!newTreeSha) throw new Error("pushHtmlOnly: new tree returned no SHA");
+
+  // Commit
+  const newCommitRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/commits`, { method: "POST", headers: GH_HEADERS, body: JSON.stringify({ message: commitMessage, tree: newTreeSha, parents: [headSha] }) });
+  if (!newCommitRes.ok) throw new Error(`pushHtmlOnly: commit failed HTTP ${newCommitRes.status}`);
+  const newCommitSha = (await newCommitRes.json()).sha;
+  if (!newCommitSha) throw new Error("pushHtmlOnly: new commit returned no SHA");
+
+  // Advance HEAD
+  const refRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/git/refs/heads/main`, { method: "PATCH", headers: GH_HEADERS, body: JSON.stringify({ sha: newCommitSha }) });
+  if (!refRes.ok) throw new Error(`pushHtmlOnly: ref update failed HTTP ${refRes.status}`);
+
+  logger.info("pushHtmlOnly: SUCCESS", { commitSha: newCommitSha });
+  return newCommitSha;
+}
 exports.counter = onRequest(
   { 
     cors: true,
@@ -417,8 +673,8 @@ exports.counter = onRequest(
     }
 
     // ── Beta: POST /counter?action=promoteBeta ───────────────────────────────
-    // Promotes beta to stable: pushes beta HTML to GitHub as public/index.html
-    // via the GitHub API, triggering the CI/CD deploy pipeline automatically.
+    // Promotes beta to stable: pushes beta HTML (and any pending DALL-E gallery images)
+    // to GitHub via the Git Trees API, triggering the CI/CD deploy pipeline.
     if (req.method === "POST" && req.query.action === "promoteBeta") {
       try {
         const betaDoc = await db.collection("config").doc("betaVersion").get();
@@ -429,64 +685,43 @@ exports.counter = onRequest(
           return res.status(400).json({ error: "Beta HTML is empty or invalid." });
         }
 
-        // Read PAT from Firestore config/secrets (server-side only, never exposed to clients)
+        // Read PAT and optional OpenAI key from Firestore secrets
         const secretsDoc = await db.collection("config").doc("secrets").get();
-        const pat = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+        const pat        = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+        const openAiKey  = secretsDoc.exists ? secretsDoc.data().openAiKey  : null;
         if (!pat) return res.status(500).json({ error: "GitHub PAT not configured. Add it via the admin panel Settings tab." });
 
-        // Step 1: Get current SHA of index.html in GitHub (required for update API)
-        const shaRes = await fetch(
-          "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
-          { headers: { "Authorization": `token ${pat}`, "User-Agent": "OldTimeyAI-AutoPilot" } }
-        );
-        if (!shaRes.ok) throw new Error(`GitHub SHA fetch failed: ${shaRes.status}`);
-        const shaData = await shaRes.json();
-        const currentSha = shaData.sha;
-        if (!currentSha) throw new Error("Could not get current file SHA from GitHub.");
+        const commitMsg = `promote: AutoPilot beta → stable (${betaData.type}, ${betaData.reportCount} reports)`;
 
-        // Step 2: Push beta HTML as new stable index.html
-        const content = Buffer.from(betaHtml).toString("base64");
-        const pushRes = await fetch(
-          "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
-          {
-            method: "PUT",
-            headers: {
-              "Authorization": `token ${pat}`,
-              "Content-Type": "application/json",
-              "User-Agent": "OldTimeyAI-AutoPilot"
-            },
-            body: JSON.stringify({
-              message: `promote: AutoPilot beta → stable (${betaData.type}, ${betaData.reportCount} reports)`,
-              content,
-              sha: currentSha
-            })
-          }
-        );
-        if (!pushRes.ok) {
-          const err = await pushRes.text();
-          throw new Error(`GitHub push failed: ${pushRes.status} — ${err.substring(0, 200)}`);
-        }
-        const pushData = await pushRes.json();
-        const commitSha = pushData.commit?.sha || "unknown";
+        // generateAndCommitGalleryImages handles BOTH cases:
+        //   - If GENERATE_IMAGE markers exist: generates images + commits images+HTML atomically
+        //   - If no markers: returns commitSha=null, cleanHtml=betaHtml (markers stripped, noop)
+        const { commitSha: imgCommitSha, imagesGenerated, cleanHtml } =
+          await generateAndCommitGalleryImages(betaHtml, pat, openAiKey, commitMsg);
 
-        // Step 3: Record promotion in Firestore
+        // If no markers were found, we still need to push the HTML to GitHub
+        const finalCommitSha = imgCommitSha
+          ? imgCommitSha
+          : await pushHtmlOnly(cleanHtml, pat, commitMsg);
+
+        // Record promotion in Firestore
         await db.collection("config").doc("stableVersion").set({
-          html: betaHtml,
-          promotedFrom: "beta",
-          commitSha,
-          promotedAt: admin.firestore.FieldValue.serverTimestamp(),
-          type: betaData.type,
-          reportCount: betaData.reportCount,
-          diagnosis: betaData.diagnosis || ""
+          html:          cleanHtml,
+          promotedFrom:  "beta",
+          commitSha:     finalCommitSha,
+          promotedAt:    admin.firestore.FieldValue.serverTimestamp(),
+          type:          betaData.type,
+          reportCount:   betaData.reportCount,
+          diagnosis:     betaData.diagnosis || ""
         });
         await db.collection("config").doc("betaVersion").update({
-          status: "promoted",
+          status:     "promoted",
           promotedAt: admin.firestore.FieldValue.serverTimestamp(),
-          commitSha
+          commitSha:  finalCommitSha
         });
 
-        logger.info("Beta promoted to stable via GitHub push", { commitSha, type: betaData.type });
-        return res.json({ ok: true, commitSha, message: "Beta pushed to GitHub — CI/CD deploying now." });
+        logger.info("Beta promoted to stable via GitHub", { commitSha: finalCommitSha, imagesGenerated });
+        return res.json({ ok: true, commitSha: finalCommitSha, imagesGenerated, message: "Beta pushed to GitHub — CI/CD deploying now." });
 
       } catch (error) {
         logger.error("promoteBeta error", { message: error.message, stack: error.stack });
@@ -601,6 +836,38 @@ exports.counter = onRequest(
         const configured = doc.exists && !!doc.data().githubPat;
         const updatedAt = doc.exists ? doc.data().updatedAt?.toDate?.()?.toISOString() || null : null;
         return res.json({ configured, updatedAt });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── OpenAI: POST /counter?action=saveOpenAiKey ────────────────────────────
+    // Stores the OpenAI API key in Firestore config/secrets (server-side only).
+    // Never exposed to clients. Used by AutoPilot for DALL-E 3 gallery generation.
+    if (req.method === "POST" && req.query.action === "saveOpenAiKey") {
+      try {
+        const { key } = req.body || {};
+        if (!key || typeof key !== "string" || !key.startsWith("sk-")) {
+          return res.status(400).json({ error: "Invalid OpenAI key — must start with 'sk-'." });
+        }
+        await db.collection("config").doc("secrets").set(
+          { openAiKey: key, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+          { merge: true }
+        );
+        logger.info("OpenAI API key saved to Firestore config/secrets");
+        return res.json({ ok: true, message: "OpenAI key saved. DALL-E gallery generation is now enabled." });
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
+      }
+    }
+
+    // ── OpenAI: GET /counter?action=checkOpenAiKey ────────────────────────────
+    // Returns whether an OpenAI key is configured (never returns the actual value).
+    if (req.method === "GET" && req.query.action === "checkOpenAiKey") {
+      try {
+        const doc = await db.collection("config").doc("secrets").get();
+        const configured = doc.exists && !!doc.data().openAiKey;
+        return res.json({ configured });
       } catch (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -881,49 +1148,39 @@ exports.counter = onRequest(
         if (betaDoc.exists && (betaDoc.data().status === "published" || betaDoc.data().status === "pending_review")) {
           const betaCreatedAt = betaDoc.data().createdAt?.toDate?.();
           if (betaCreatedAt) {
-            const betaAgeMs = Date.now() - betaCreatedAt.getTime();
+            const betaAgeMs    = Date.now() - betaCreatedAt.getTime();
             const autoPromoteMs = autoPromoteMinutes * 60 * 1000;
             if (betaAgeMs >= autoPromoteMs) {
               logger.info("Heartbeat: auto-promoting beta to stable", { ageMinutes: Math.round(betaAgeMs / 60000) });
               try {
-                const secretsDoc = await db.collection("config").doc("secrets").get();
-                const pat = secretsDoc.exists ? secretsDoc.data().githubPat : null;
+                const secretsDoc  = await db.collection("config").doc("secrets").get();
+                const pat         = secretsDoc.exists ? secretsDoc.data().githubPat  : null;
+                const openAiKey   = secretsDoc.exists ? secretsDoc.data().openAiKey  : null;
+
                 if (pat) {
-                  const shaRes = await fetch(
-                    "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
-                    { headers: { "Authorization": `token ${pat}`, "User-Agent": "OldTimeyAI-AutoPilot" } }
-                  );
-                  if (shaRes.ok) {
-                    const shaData = await shaRes.json();
-                    const betaHtml = betaDoc.data().html;
-                    // Safety guard: never auto-promote if HTML is suspiciously small
-                    if (!betaHtml || betaHtml.length < 10000) {
-                      logger.error("Heartbeat: auto-promote aborted — HTML too small", { length: betaHtml?.length });
-                      await db.collection("config").doc("betaVersion").delete();
-                      return res.json({ ok: true, message: "Auto-promote aborted: beta HTML invalid, cleared." });
-                    }
-                    const pushRes = await fetch(
-                      "https://api.github.com/repos/bruceinpb/oldtimeyai/contents/public/index.html",
-                      {
-                        method: "PUT",
-                        headers: { "Authorization": `token ${pat}`, "Content-Type": "application/json", "User-Agent": "OldTimeyAI-AutoPilot" },
-                        body: JSON.stringify({
-                          message: `auto-promote: AutoPilot beta → stable (${autoPromoteMinutes}min auto-promote)`,
-                          content: Buffer.from(betaHtml).toString("base64"),
-                          sha: shaData.sha
-                        })
-                      }
-                    );
-                    if (pushRes.ok) {
-                      const pushData = await pushRes.json();
-                      await db.collection("config").doc("betaVersion").update({
-                        status: "promoted",
-                        promotedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        autoPromoted: true,
-                        commitSha: pushData.commit?.sha || "unknown"
-                      });
-                      logger.info("Heartbeat: auto-promote SUCCESS");
-                    }
+                  const betaHtml = betaDoc.data().html;
+                  if (!betaHtml || betaHtml.length < 10000) {
+                    logger.error("Heartbeat: auto-promote aborted — HTML too small", { length: betaHtml?.length });
+                    await db.collection("config").doc("betaVersion").delete();
+                    return res.json({ ok: true, message: "Auto-promote aborted: beta HTML invalid, cleared." });
+                  }
+
+                  const commitMsg = `auto-promote: AutoPilot beta → stable (${autoPromoteMinutes}min auto-promote)`;
+                  const { commitSha: imgCommitSha, cleanHtml } =
+                    await generateAndCommitGalleryImages(betaHtml, pat, openAiKey, commitMsg);
+
+                  const finalCommitSha = imgCommitSha
+                    ? imgCommitSha
+                    : await pushHtmlOnly(cleanHtml, pat, commitMsg);
+
+                  if (finalCommitSha) {
+                    await db.collection("config").doc("betaVersion").update({
+                      status:      "promoted",
+                      promotedAt:  admin.firestore.FieldValue.serverTimestamp(),
+                      autoPromoted: true,
+                      commitSha:   finalCommitSha
+                    });
+                    logger.info("Heartbeat: auto-promote SUCCESS", { commitSha: finalCommitSha });
                   }
                 }
               } catch (promoteErr) {
@@ -1037,36 +1294,58 @@ exports.counter = onRequest(
           logger.warn("Heartbeat: some patches failed to match", { patchCount, failedCount: patchErrors.length, errors: patchErrors });
         }
 
-        // ── 7. Build chain history ───────────────────────────────────────
+        // ── 7. Generate gallery images + commit HTML to GitHub ───────────────
+        // Scan patched HTML for GENERATE_IMAGE markers. If found, call DALL-E 3 for each
+        // and commit all images + HTML atomically via Git Trees API. Either way, get
+        // cleanHtml (markers stripped) which is what we save everywhere.
+        const secretsDocImg = await db.collection("config").doc("secrets").get();
+        const patImg         = secretsDocImg.exists ? secretsDocImg.data().githubPat  : null;
+        const openAiKeyImg   = secretsDocImg.exists ? secretsDocImg.data().openAiKey  : null;
+
+        const diagMsg = `autopilot: ${diagnosis.substring(0, 80)} (${allReports.length} report(s))`;
+        const { commitSha: imgCommitSha, imagesGenerated, cleanHtml } =
+          await generateAndCommitGalleryImages(html, patImg, openAiKeyImg, diagMsg);
+
+        // If there were no GENERATE_IMAGE markers, generateAndCommitGalleryImages returned
+        // commitSha=null — we do NOT push here; the auto-promote path will push when beta matures.
+        // (We never push on every heartbeat cycle — only on promote.)
+        if (imgCommitSha) {
+          logger.info("Heartbeat: gallery images committed alongside HTML", {
+            imagesGenerated, commitSha: imgCommitSha
+          });
+        }
+
+        // ── 8. Build chain history ────────────────────────────────────────────
         const existingChain = (freshBetaDoc.exists && freshBetaDoc.data().betaChain) ? freshBetaDoc.data().betaChain : [];
         const newChainEntry = {
           diagnosis,
           bugCount,
           featureCount,
           reportCount: allReports.length,
-          appliedAt: new Date().toISOString()
+          appliedAt:   new Date().toISOString()
         };
         const betaChain = [...existingChain, newChainEntry];
 
-        // ── 8. Save new beta (overwrites any existing) ───────────────────
+        // ── 9. Save beta to Firestore — always use cleanHtml (markers stripped) ──
         await db.collection("config").doc("betaVersion").set({
-          html,
+          html:         cleanHtml,   // markers stripped; img src still points to /gallery/cardN.png
           diagnosis,
           betaChain,
-          type: "mixed",
+          type:         "mixed",
           bugCount,
           featureCount,
-          reportCount: allReports.length,
-          status: "published",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),  // always fresh — auto-promote timer starts from this batch
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          promotedAt: null,
+          reportCount:  allReports.length,
+          status:       "published",
+          createdAt:    admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
+          promotedAt:   null,
           autoTriggered: true,
-          triggeredBy: "heartbeat",
-          patchLayers: betaChain.length
+          triggeredBy:  "heartbeat",
+          patchLayers:  betaChain.length,
+          ...(imgCommitSha ? { galleryCommitSha: imgCommitSha } : {})
         });
 
-        // ── 9. Mark ALL pending reports reviewed ─────────────────────────
+        // ── 10. Mark ALL pending reports reviewed ─────────────────────────────
         const batch = db.batch();
         allPendingSnap.forEach(doc => batch.update(doc.ref, { status: "reviewed" }));
         await batch.commit();
