@@ -133,10 +133,10 @@
             font-weight: 900;
             color: var(--cream);
             text-shadow: 
-                0 0 10px rgba(255, 0, 0, 0.5),
-                0 0 20px rgba(255, 0, 0, 0.3),
-                0 0 40px rgba(255, 0, 0, 0.2),
-                4px 4px 0 rgb(255, 0, 0);
+                0 0 10px rgba(135, 206, 250, 0.5),
+                0 0 20px rgba(135, 206, 250, 0.3),
+                0 0 40px rgba(135, 206, 250, 0.2),
+                4px 4px 0 rgb(135, 206, 250);
             letter-spacing: 5px;
             margin-bottom: 15px;
         }
@@ -2542,30 +2542,55 @@ let _lastKnownBetaCreatedAt = null;
                     betaBtn.classList.remove('disabled', 'beta-seen');
                     betaBtn.onclick = applyBetaVersion;
 
-                    // Has user already clicked this beta this session?
-                    const seenAt = sessionStorage.getItem('beta_seen_at');
-                    const betaUpdatedAt = data.updatedAt || data.createdAt;
-                    const isNew = !seenAt || (betaUpdatedAt && new Date(betaUpdatedAt) > new Date(seenAt));
+                    // ── Time-based modal trigger ───────────────────────────────────────
+                    // OLD BUG: modal fired the instant the beta was published, so
+                    // location.reload() ran before auto-promote + CI/CD finished (~7min).
+                    // User saw the OLD stable page after reload — no visible change.
+                    //
+                    // FIX: calculate exactly when the new stable page will be live:
+                    //   promotesAt   = createdAt + autoPromoteMinutes + 120s CI/CD buffer
+                    //   modalFiresAt = promotesAt - clientModalSeconds
+                    // Modal fires at modalFiresAt. Countdown expires at promotesAt.
+                    // location.reload() then lands on the freshly deployed stable page.
+                    const clientModalSecs  = data.clientModalSeconds  || 30;
+                    const autoPromoteMins  = data.autoPromoteMinutes  || 5;
+                    const CI_CD_BUFFER_SEC = 120;
+                    const createdAt        = data.createdAt ? new Date(data.createdAt) : null;
 
-                    if (isNew) {
-                        // Show mandatory update countdown modal for newly detected beta
-                        if (_lastKnownBetaCreatedAt !== betaUpdatedAt && !_updateModalShown) {
-                            _lastKnownBetaCreatedAt = betaUpdatedAt;
-                            showUpdateModal(data);
-                        }
-                        // Update bottom button
+                    const seenAt        = sessionStorage.getItem('beta_seen_at');
+                    const betaUpdatedAt = data.updatedAt || data.createdAt;
+                    const alreadySeen   = seenAt && new Date(betaUpdatedAt) <= new Date(seenAt);
+
+                    if (!alreadySeen) {
                         betaBtn.classList.add('beta-available');
-                        const layers = data.patchLayers || 1;
-                        const bugs = data.bugCount || 0;
+                        const bugs     = data.bugCount    || 0;
                         const features = data.featureCount || 0;
-                        const parts = [];
+                        const parts    = [];
                         if (bugs)     parts.push(`${bugs} bug${bugs>1?'s':''}`);
                         if (features) parts.push(`${features} feature${features>1?'s':''}`);
                         const desc = parts.length ? parts.join(' + ') : 'updates';
                         betaBtn.textContent = `✨ New Beta — ${desc}`;
-                        betaBtn.title = `AutoPilot has fixed ${desc}. Click to try!`;
+                        betaBtn.title = `AutoPilot has fixed ${desc}. Auto-update loading soon!`;
+
+                        if (createdAt && !_updateModalShown && _lastKnownBetaCreatedAt !== betaUpdatedAt) {
+                            _lastKnownBetaCreatedAt = betaUpdatedAt;
+                            const promotesAtMs   = createdAt.getTime()
+                                                 + (autoPromoteMins  * 60 * 1000)
+                                                 + (CI_CD_BUFFER_SEC * 1000);
+                            const modalFiresAtMs = promotesAtMs - (clientModalSecs * 1000);
+                            const msUntilModal   = modalFiresAtMs - Date.now();
+
+                            if (msUntilModal <= 0) {
+                                // Already past modal-fire time — show immediately
+                                showUpdateModal(data);
+                            } else {
+                                // Schedule modal for exactly the right moment
+                                setTimeout(() => {
+                                    if (!_updateModalShown) showUpdateModal(data);
+                                }, msUntilModal);
+                            }
+                        }
                     } else {
-                        // User has already seen this beta — stable smaller style
                         betaBtn.classList.remove('beta-available');
                         betaBtn.classList.add('beta-seen');
                         betaBtn.textContent = '⚗ Try Beta Again';
@@ -2584,7 +2609,6 @@ let _lastKnownBetaCreatedAt = null;
                     const banner = document.getElementById('betaRevertBanner');
                     if (banner && (data.status === 'promoted' || !data.exists)) {
                         banner.remove();
-                        // Remove the spacer div that follows the banner
                         const spacer = banner.nextElementSibling;
                         if (spacer && spacer.style.height === '48px') spacer.remove();
                         sessionStorage.removeItem('using_beta');

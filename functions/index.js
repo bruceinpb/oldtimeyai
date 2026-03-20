@@ -588,6 +588,7 @@ exports.counter = onRequest(
         const settingsSnap = await db.collection("config").doc("settings").get();
         const clientModalSeconds     = settingsSnap.exists ? (settingsSnap.data().clientModalSeconds     || 30) : 30;
         const bugReportWindowMinutes = settingsSnap.exists ? (settingsSnap.data().bugReportWindowMinutes || 5)  : 5;
+        const autoPromoteMinutes     = settingsSnap.exists ? (settingsSnap.data().autoPromoteMinutes     || 5)  : 5;
 
         // ── Self-healing: if Cloud Scheduler has gone silent, re-trigger heartbeat ──
         // getBeta is called by the client poller every 60s, so this fires regularly.
@@ -621,6 +622,7 @@ exports.counter = onRequest(
           autoTriggered: d.autoTriggered || false,
           clientModalSeconds,
           bugReportWindowMinutes,
+          autoPromoteMinutes,
           createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
           updatedAt: d.updatedAt?.toDate?.()?.toISOString() || null,
           promotedAt: d.promotedAt?.toDate?.()?.toISOString() || null,
