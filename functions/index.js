@@ -142,22 +142,28 @@ async function generateAndCommitGalleryImages(html, pat, openAiKey, commitMessag
     markers.push({ slot: parseInt(m[1], 10), desc: m[2].trim(), fullMatch: m[0] });
   }
 
-  // Always strip markers so cleanHtml is safe to save / show to users
+  // Strip markers from cleanHtml ONLY if we have a key and will actually generate.
+  // If no key, keep markers intact so the next heartbeat/promote attempt can retry.
+  // (Stripping unconditionally was the bug: markers disappeared before images were made.)
   let cleanHtml = html;
-  for (const marker of markers) {
-    cleanHtml = cleanHtml.replace(marker.fullMatch, "");
-  }
 
-  // If no markers or no OpenAI key, return immediately — caller handles the push
+  // If no markers, nothing to do
   if (markers.length === 0) {
     logger.info("generateAndCommitGalleryImages: no markers found — skipping image generation");
     return { commitSha: null, imagesGenerated: 0, cleanHtml };
   }
+
+  // If no OpenAI key, return html unchanged so markers survive to the next attempt
   if (!openAiKey) {
-    logger.warn("generateAndCommitGalleryImages: markers found but no OpenAI key configured", {
+    logger.warn("generateAndCommitGalleryImages: markers found but no OpenAI key configured — markers preserved for next run", {
       slots: markers.map(mk => mk.slot)
     });
-    return { commitSha: null, imagesGenerated: 0, cleanHtml };
+    return { commitSha: null, imagesGenerated: 0, cleanHtml: html };
+  }
+
+  // Key is present — strip markers now (images about to be generated)
+  for (const marker of markers) {
+    cleanHtml = cleanHtml.replace(marker.fullMatch, "");
   }
 
   logger.info("generateAndCommitGalleryImages: starting", {
