@@ -1300,21 +1300,55 @@ exports.counter = onRequest(
           logger.warn("Heartbeat: some patches failed to match", { patchCount, failedCount: patchErrors.length, errors: patchErrors });
         }
 
-        // ── 7. Generate gallery images + commit HTML to GitHub ───────────────
-        // Scan patched HTML for GENERATE_IMAGE markers. If found, call DALL-E 3 for each
-        // and commit all images + HTML atomically via Git Trees API. Either way, get
-        // cleanHtml (markers stripped) which is what we save everywhere.
+        // ── 7. Auto-inject GENERATE_IMAGE markers + commit images to GitHub ────
+        // Claude is instructed to add GENERATE_IMAGE markers when changing card labels,
+        // but may not always comply. As a safety net, detect label changes by comparing
+        // patched HTML vs base HTML, and auto-inject markers for any that are missing.
+        // This makes image generation automatic and robust — no Claude compliance required.
         const secretsDocImg = await db.collection("config").doc("secrets").get();
         const patImg         = secretsDocImg.exists ? secretsDocImg.data().githubPat  : null;
         const openAiKeyImg   = secretsDocImg.exists ? secretsDocImg.data().openAiKey  : null;
 
+        // Extract {slot -> label} map from gallery HTML
+        function extractGalleryLabels(h) {
+          const chunk = h.slice(h.indexOf('<div class="gallery">'), h.indexOf('<!-- Main Layout'));
+          const re = /src="\/gallery\/card(\d+)\.png"[^>]*>(?:<!--[^-]*-->)?\s*<div class="card-label">([^<]+)<\/div>/g;
+          const out = {};
+          let gm;
+          while ((gm = re.exec(chunk)) !== null) {
+            out[parseInt(gm[1], 10)] = gm[2].trim();
+          }
+          return out;
+        }
+
+        const baseLabels    = extractGalleryLabels(baseHtml);
+        const patchedLabels = extractGalleryLabels(html);
+
+        // For each slot where label changed and no marker already present, auto-inject
+        let htmlWithMarkers = html;
+        const autoInjected  = [];
+        for (const [slotStr, newLabel] of Object.entries(patchedLabels)) {
+          const slot     = parseInt(slotStr, 10);
+          const oldLabel = baseLabels[slot];
+          const alreadyMarked = new RegExp(`GENERATE_IMAGE:slot=${slot}:`).test(html);
+          if (newLabel !== oldLabel && !alreadyMarked) {
+            const desc   = `${newLabel}, vintage sepia-toned antique photograph style, high contrast, historically accurate, period-appropriate`;
+            const imgRe  = new RegExp(`(src="/gallery/card${slot}\\.png"[^>]*>)(?:<!--[^>]*-->)?`);
+            if (imgRe.test(htmlWithMarkers)) {
+              htmlWithMarkers = htmlWithMarkers.replace(imgRe, `$1<!-- GENERATE_IMAGE:slot=${slot}:${desc} -->`);
+              autoInjected.push({ slot, oldLabel, newLabel });
+              logger.info(`Heartbeat: auto-injected GENERATE_IMAGE for card ${slot}`, { oldLabel, newLabel });
+            }
+          }
+        }
+        if (autoInjected.length > 0) {
+          logger.info("Heartbeat: auto-injected markers", { count: autoInjected.length });
+        }
+
         const diagMsg = `autopilot: ${diagnosis.substring(0, 80)} (${allReports.length} report(s))`;
         const { commitSha: imgCommitSha, imagesGenerated, cleanHtml } =
-          await generateAndCommitGalleryImages(html, patImg, openAiKeyImg, diagMsg);
+          await generateAndCommitGalleryImages(htmlWithMarkers, patImg, openAiKeyImg, diagMsg);
 
-        // If there were no GENERATE_IMAGE markers, generateAndCommitGalleryImages returned
-        // commitSha=null — we do NOT push here; the auto-promote path will push when beta matures.
-        // (We never push on every heartbeat cycle — only on promote.)
         if (imgCommitSha) {
           logger.info("Heartbeat: gallery images committed alongside HTML", {
             imagesGenerated, commitSha: imgCommitSha
