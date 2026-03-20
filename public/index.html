@@ -2535,32 +2535,66 @@ let _lastKnownBetaCreatedAt = null;
                 const r = await fetch(BETA_ENDPOINT);
                 if (!r.ok) return;
                 const data = await r.json();
-                _betaData = data;  // store for nvmDismiss to use
+                _betaData = data;
                 const betaBtn = document.getElementById('betaBtn');
                 if (!betaBtn) return;
 
+                // ── Constants ────────────────────────────────────────────────────────
+                const CI_CD_BUFFER_SEC = 120;   // conservative CI/CD deploy time after GitHub push
+                const STALE_WINDOW_MS  = 30 * 60 * 1000;  // ignore updates older than 30 min
+                const clientModalSecs  = data.clientModalSeconds  || 30;
+                const betaUpdatedAt    = data.updatedAt || data.createdAt;
+
+                // ── Already-seen guard ───────────────────────────────────────────────
+                // beta_seen_at is stamped just before location.reload() in showUpdateModal.
+                // If it's set to this beta's timestamp, we already handled this update.
+                const seenAt     = sessionStorage.getItem('beta_seen_at');
+                const alreadySeen = seenAt && betaUpdatedAt && new Date(betaUpdatedAt) <= new Date(seenAt);
+
+                // ── Reload trigger: runs on EVERY poll tick ──────────────────────────
+                // This is the core architectural fix. Previous code put the reload logic
+                // inside status !== 'promoted' — so if the user loaded the page AFTER
+                // the beta was promoted, the timing block never ran and no reload fired.
+                //
+                // Now: we check githubPushedAt on every poll, regardless of status.
+                // githubPushedAt is stamped the moment the GitHub push succeeds.
+                // stableAt = githubPushedAt + CI_CD_BUFFER_SEC — when Firebase is live.
+                // modalFiresAt = stableAt - clientModalSeconds — when modal should appear.
+                //
+                // Works correctly when:
+                //   - Page was loaded before beta existed
+                //   - Page was loaded while beta was published (not yet promoted)
+                //   - Page was loaded AFTER beta was already promoted  ← the broken case
+                //   - Device was asleep and woke up (visibilitychange fires this)
+                //   - Tab was backgrounded and refocused
+                //   - Any scheduler jitter in auto-promote timing
+                if (data.githubPushedAt && !alreadySeen && !_updateModalShown) {
+                    const stableAtMs    = data.githubPushedAt + (CI_CD_BUFFER_SEC * 1000);
+                    const modalFiresAtMs = stableAtMs - (clientModalSecs * 1000);
+                    const now            = Date.now();
+                    const age            = now - data.githubPushedAt;
+
+                    // Only act on recent pushes — ignore anything older than 30 min.
+                    // If 30+ min have passed, the user is already on the latest stable page
+                    // (no-cache headers ensure they got it on their next visit).
+                    if (age < STALE_WINDOW_MS) {
+                        if (now >= modalFiresAtMs) {
+                            // Time to show the modal. location.reload() fires after countdown.
+                            // showUpdateModal stamps beta_seen_at and _stableLoad before reload
+                            // so this block won't re-trigger on the fresh page load.
+                            showUpdateModal(data);
+                        }
+                        // If now < modalFiresAtMs: not time yet. Return here and the next
+                        // poll tick (60s later, or on visibilitychange) will check again.
+                        // No setTimeout needed — the poller IS the timer.
+                    }
+                }
+
+                // ── Beta button state ────────────────────────────────────────────────
                 if (data.exists && data.html && data.status !== 'promoted') {
+                    // Beta is live and not yet promoted — show beta button
                     betaBtn.classList.remove('disabled', 'beta-seen');
                     betaBtn.onclick = applyBetaVersion;
-
-                    // ── Time-based modal trigger ───────────────────────────────────────
-                    // OLD BUG: modal fired the instant the beta was published, so
-                    // location.reload() ran before auto-promote + CI/CD finished (~7min).
-                    // User saw the OLD stable page after reload — no visible change.
-                    //
-                    // FIX: calculate exactly when the new stable page will be live:
-                    //   promotesAt   = createdAt + autoPromoteMinutes + 120s CI/CD buffer
-                    //   modalFiresAt = promotesAt - clientModalSeconds
-                    // Modal fires at modalFiresAt. Countdown expires at promotesAt.
-                    // location.reload() then lands on the freshly deployed stable page.
-                    const clientModalSecs  = data.clientModalSeconds  || 30;
-                    const autoPromoteMins  = data.autoPromoteMinutes  || 5;
-                    const CI_CD_BUFFER_SEC = 120;
-                    const createdAt        = data.createdAt ? new Date(data.createdAt) : null;
-
-                    const seenAt        = sessionStorage.getItem('beta_seen_at');
-                    const betaUpdatedAt = data.updatedAt || data.createdAt;
-                    const alreadySeen   = seenAt && new Date(betaUpdatedAt) <= new Date(seenAt);
 
                     if (!alreadySeen) {
                         betaBtn.classList.add('beta-available');
@@ -2571,59 +2605,7 @@ let _lastKnownBetaCreatedAt = null;
                         if (features) parts.push(`${features} feature${features>1?'s':''}`);
                         const desc = parts.length ? parts.join(' + ') : 'updates';
                         betaBtn.textContent = `✨ New Beta — ${desc}`;
-                        betaBtn.title = `AutoPilot has fixed ${desc}. Auto-update loading soon!`;
-
-                        if (createdAt && !_updateModalShown && _lastKnownBetaCreatedAt !== betaUpdatedAt) {
-                            _lastKnownBetaCreatedAt = betaUpdatedAt;
-
-                            // ── How we calculate when the reload should fire ────────────────
-                            // Root cause of the previous bug: we estimated promotesAt as
-                            // createdAt + autoPromoteMinutes, but the heartbeat runs on a
-                            // fixed Cloud Scheduler tick. If the beta was created just after
-                            // a heartbeat, the actual promote fires up to heartbeatInterval
-                            // minutes later. This made the modal fire up to 5 min too early,
-                            // before the new stable page was on Firebase Hosting.
-                            //
-                            // Fix: use data.githubPushedAt when available (server stamps it
-                            // at the exact moment the GitHub push succeeds). The reload fires
-                            // CI_CD_BUFFER_SEC after that — when Firebase is definitely live.
-                            //
-                            // If githubPushedAt is null (beta not yet promoted), fall back to
-                            // the estimate using createdAt. The setTimeout will re-run on the
-                            // next poller tick (60s) and upgrade to the real timestamp once
-                            // the server promotes and stamps githubPushedAt.
-                            let stableAtMs;
-                            if (data.githubPushedAt) {
-                                // EXACT: server told us when GitHub push happened
-                                stableAtMs = data.githubPushedAt + (CI_CD_BUFFER_SEC * 1000);
-                            } else {
-                                // ESTIMATE: beta not yet promoted — use createdAt + worst-case delay
-                                // Worst case = autoPromoteMinutes + one full heartbeat cycle (jitter)
-                                const heartbeatJitterMs = (autoPromoteMins * 60 * 1000);
-                                stableAtMs = createdAt.getTime()
-                                           + heartbeatJitterMs             // actual promote time (unknown)
-                                           + (autoPromoteMins * 60 * 1000) // double the window = safe upper bound
-                                           + (CI_CD_BUFFER_SEC * 1000);
-                                // This over-estimates intentionally — better to show modal a bit late
-                                // than to reload before the new stable is live.
-                            }
-
-                            const modalFiresAtMs = stableAtMs - (clientModalSecs * 1000);
-                            const msUntilModal   = modalFiresAtMs - Date.now();
-
-                            if (msUntilModal <= 0) {
-                                // Already past modal-fire time — show immediately
-                                showUpdateModal(data);
-                            } else {
-                                // Schedule modal for exactly the right moment.
-                                // The poller runs every 60s — if githubPushedAt becomes available
-                                // before this timeout fires, the next poll will recalculate with
-                                // the exact timestamp and may fire sooner/later as appropriate.
-                                setTimeout(() => {
-                                    if (!_updateModalShown) showUpdateModal(data);
-                                }, msUntilModal);
-                            }
-                        }
+                        betaBtn.title = `AutoPilot has fixed ${desc}. Auto-update coming soon!`;
                     } else {
                         betaBtn.classList.remove('beta-available');
                         betaBtn.classList.add('beta-seen');
@@ -2631,7 +2613,7 @@ let _lastKnownBetaCreatedAt = null;
                         betaBtn.title = 'Beta version available — click to switch back';
                     }
                 } else {
-                    // No beta available (or promoted to stable)
+                    // No active beta — disable button and clean up if needed
                     betaBtn.classList.add('disabled');
                     betaBtn.classList.remove('beta-available', 'beta-seen');
                     betaBtn.textContent = '⚗ Use Beta Version';
@@ -2639,14 +2621,15 @@ let _lastKnownBetaCreatedAt = null;
                     betaBtn.onclick = null;
 
                     // If user was on beta and it just got promoted to stable,
-                    // remove the beta banner — they are now on the stable version
+                    // remove the beta banner — they are now on the stable version.
+                    // NOTE: do NOT clear beta_seen_at here — it guards against re-firing
+                    // the reload modal on the fresh page load after location.reload().
                     const banner = document.getElementById('betaRevertBanner');
                     if (banner && (data.status === 'promoted' || !data.exists)) {
                         banner.remove();
                         const spacer = banner.nextElementSibling;
                         if (spacer && spacer.style.height === '48px') spacer.remove();
                         sessionStorage.removeItem('using_beta');
-                        sessionStorage.removeItem('beta_seen_at');
                         sessionStorage.removeItem('bug_report_window_end');
                     }
                 }
