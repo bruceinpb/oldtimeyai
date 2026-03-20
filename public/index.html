@@ -2338,16 +2338,18 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
 
         const BETA_ENDPOINT = `${API_BASE}/counter?action=getBeta`;
 
-        // If sessionStorage thinks we're on beta but we arrived via a real page load
-        // (location.reload from the mandatory countdown), clear all stale beta flags.
-        // The '_stableLoad' marker is set just before location.reload() fires.
-        if (sessionStorage.getItem('using_beta') === 'true' && sessionStorage.getItem('_stableLoad') === '1') {
+        // If we arrived here via the mandatory countdown reload, clean up beta state.
+        // IMPORTANT: we KEEP beta_seen_at (stamped just before reload) so that
+        // checkBetaStatus() evaluates isNew=false and does NOT re-show the modal.
+        // Clearing beta_seen_at was the root cause of the infinite modal loop.
+        if (sessionStorage.getItem('_stableLoad') === '1') {
             sessionStorage.removeItem('using_beta');
-            sessionStorage.removeItem('beta_seen_at');
             sessionStorage.removeItem('bug_report_window_end');
             sessionStorage.removeItem('bug_report_window_mins');
             sessionStorage.removeItem('bug_report_modal_secs');
             sessionStorage.removeItem('bug_report_beta_created');
+            // beta_seen_at is intentionally NOT removed — it was stamped = betaUpdatedAt
+            // just before reload so the modal won't re-trigger on the stable page.
         }
         sessionStorage.removeItem('_stableLoad'); // always clear marker regardless
 
@@ -2458,9 +2460,13 @@ let _lastKnownBetaCreatedAt = null;
             // MANDATORY: auto-reload fires after countdown regardless of dismiss
             if (_updateTimer) clearTimeout(_updateTimer);
             _updateTimer = setTimeout(() => {
-                _updateModalShown = false; // reset flag before reload
                 overlay.classList.remove('active');
-                sessionStorage.setItem('_stableLoad', '1'); // tells stable page to clear beta flags
+                // Stamp beta_seen_at = this beta's timestamp so the reloaded stable page
+                // evaluates isNew=false and does NOT re-show the modal.
+                // This is the key fix for the infinite modal loop.
+                const betaTs = (_updateBetaData?.updatedAt) || (_updateBetaData?.createdAt) || new Date().toISOString();
+                sessionStorage.setItem('beta_seen_at', betaTs);
+                sessionStorage.setItem('_stableLoad', '1');
                 location.reload();
             }, clientModalSeconds * 1000);
         }

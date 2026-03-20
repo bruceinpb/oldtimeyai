@@ -69,7 +69,11 @@ RULES:
   Medieval city:   https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop
   Art/Picasso:     https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop
   Ford Model T:    https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop
-  For ANY new image type, pick the closest match from the list above. Do NOT invent URLs.`;
+  For ANY new image type, pick the closest match from the list above. Do NOT invent URLs.
+- CRITICAL: NEVER modify the modal loop prevention logic. The following are protected:
+  sessionStorage keys: 'beta_seen_at', '_stableLoad', 'using_beta'
+  JS variables: _updateModalShown, _lastKnownBetaCreatedAt, _updateBetaData, _updateTimer
+  These work as a cross-reload handshake. Any change to them causes infinite modal loops.`;
 }
 
 function applyPatches(html, fullResponse) {
