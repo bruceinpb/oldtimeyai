@@ -68,6 +68,7 @@ RULES:
   Victorian city:  https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=500&fit=crop
   Medieval city:   https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=500&fit=crop
   Art/Picasso:     https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=500&fit=crop
+  Ford Model T:    https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop
   For ANY new image type, pick the closest match from the list above. Do NOT invent URLs.`;
 }
 

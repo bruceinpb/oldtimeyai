@@ -2337,6 +2337,20 @@ Remember: A quiet home is a blessing, but a home free of witch trials is worth i
         // ── AutoPilot: Beta version loader + live poller ─────────────────────
 
         const BETA_ENDPOINT = `${API_BASE}/counter?action=getBeta`;
+
+        // If sessionStorage thinks we're on beta but we arrived via a real page load
+        // (location.reload from the mandatory countdown), clear all stale beta flags.
+        // The '_stableLoad' marker is set just before location.reload() fires.
+        if (sessionStorage.getItem('using_beta') === 'true' && sessionStorage.getItem('_stableLoad') === '1') {
+            sessionStorage.removeItem('using_beta');
+            sessionStorage.removeItem('beta_seen_at');
+            sessionStorage.removeItem('bug_report_window_end');
+            sessionStorage.removeItem('bug_report_window_mins');
+            sessionStorage.removeItem('bug_report_modal_secs');
+            sessionStorage.removeItem('bug_report_beta_created');
+        }
+        sessionStorage.removeItem('_stableLoad'); // always clear marker regardless
+
         const _isBetaSession = sessionStorage.getItem('using_beta') === 'true';
         let _betaPollerInterval = null;
 let _lastKnownBetaCreatedAt = null;
@@ -2441,6 +2455,7 @@ let _lastKnownBetaCreatedAt = null;
             if (_updateTimer) clearTimeout(_updateTimer);
             _updateTimer = setTimeout(() => {
                 overlay.classList.remove('active');
+                sessionStorage.setItem('_stableLoad', '1'); // tells stable page to clear beta flags
                 location.reload();
             }, clientModalSeconds * 1000);
         }
