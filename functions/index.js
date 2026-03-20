@@ -221,11 +221,13 @@ exports.counter = onRequest(
             const settingsDoc = await db.collection("config").doc("settings").get();
             const threshold = settingsDoc.exists ? (settingsDoc.data().threshold || 5) : 5;
 
-            // Don't re-queue if beta already exists or queue already pending
+            // Don't re-queue if beta is actively being reviewed or already queued for analysis.
+            // A "published" beta is fine — new reports should still be counted and will layer
+            // on top of the existing beta on the next heartbeat cycle.
             const betaDoc = await db.collection("config").doc("betaVersion").get();
             if (betaDoc.exists) {
               const s = betaDoc.data().status;
-              if (s === "pending_review" || s === "published" || s === "queued") return;
+              if (s === "pending_review" || s === "queued") return;
             }
             const queueDoc = await db.collection("config").doc("analysisQueue").get();
             if (queueDoc.exists && queueDoc.data().status === "queued") return;
@@ -324,6 +326,25 @@ exports.counter = onRequest(
         const settingsSnap = await db.collection("config").doc("settings").get();
         const clientModalSeconds     = settingsSnap.exists ? (settingsSnap.data().clientModalSeconds     || 30) : 30;
         const bugReportWindowMinutes = settingsSnap.exists ? (settingsSnap.data().bugReportWindowMinutes || 5)  : 5;
+
+        // ── Self-healing: if Cloud Scheduler has gone silent, re-trigger heartbeat ──
+        // getBeta is called by the client poller every 60s, so this fires regularly.
+        // If lastHeartbeatAt is older than 2× the configured interval, kick it off.
+        const lastHeartbeatAt   = settingsSnap.exists ? settingsSnap.data().lastHeartbeatAt : null;
+        const heartbeatInterval = settingsSnap.exists ? (settingsSnap.data().heartbeatInterval || 5) : 5;
+        const staleCutoffMs     = heartbeatInterval * 2 * 60 * 1000;
+        const heartbeatAgeMs    = lastHeartbeatAt ? (Date.now() - lastHeartbeatAt.toDate().getTime()) : Infinity;
+        if (heartbeatAgeMs > staleCutoffMs) {
+          logger.warn("getBeta: heartbeat appears stale — self-healing trigger", {
+            ageMinutes: Math.round(heartbeatAgeMs / 60000),
+            thresholdMinutes: heartbeatInterval * 2
+          });
+          // Fire-and-forget: don't await, don't block the response
+          fetch(`https://us-central1-${process.env.GCLOUD_PROJECT || "oldtimeyai-928be"}.cloudfunctions.net/counter?action=heartbeat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          }).catch(e => logger.error("Self-heal heartbeat trigger failed", { message: e.message }));
+        }
 
         return res.json({
           exists: true,
@@ -1002,6 +1023,19 @@ exports.counter = onRequest(
 
         const { patched: html, patchCount, errors: patchErrors } = applyPatches(baseHtml, fullResponse);
         logger.info("Heartbeat patches applied", { patchCount, patchErrors: patchErrors.length });
+
+        // ── Patch safety gate ────────────────────────────────────────────
+        // If EVERY patch failed to match, the HTML is unchanged and saving it would
+        // silently consume reports without actually fixing anything — causing an
+        // endless loop where the same bug is "addressed" every cycle but never fixed.
+        // Throw here so reports stay pending and the next heartbeat retries from scratch.
+        if (patchCount === 0) {
+          const errSummary = patchErrors.slice(0, 3).join(" | ");
+          throw new Error(`All ${patchErrors.length} patch(es) failed to match — HTML unchanged. Not saving. Errors: ${errSummary}`);
+        }
+        if (patchErrors.length > 0) {
+          logger.warn("Heartbeat: some patches failed to match", { patchCount, failedCount: patchErrors.length, errors: patchErrors });
+        }
 
         // ── 7. Build chain history ───────────────────────────────────────
         const existingChain = (freshBetaDoc.exists && freshBetaDoc.data().betaChain) ? freshBetaDoc.data().betaChain : [];
