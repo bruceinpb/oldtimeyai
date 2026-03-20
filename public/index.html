@@ -1415,7 +1415,7 @@
                     <div class="card-label">Medieval Castle</div>
                 </div>
                 <div class="vintage-card">
-                    <img src="https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop" alt="Ford Model T" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?w=400&h=500&fit=crop'">
+                    <img src="https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop" alt="Ford Model T" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=500&fit=crop'">
                     <div class="card-label">Ford Model T</div>
                 </div>
             </div>
@@ -2360,8 +2360,12 @@ let _lastKnownBetaCreatedAt = null;
         // ── Incoming Update Modal ──────────────────────────────────────────
         let _updateTimer = null;       // the mandatory auto-reload timer
         let _updateBetaData = null;    // beta data for the current update
+        let _updateModalShown = false; // prevent duplicate modal displays
 
         function showUpdateModal(data) {
+            // Prevent duplicate modal displays
+            if (_updateModalShown) return;
+            _updateModalShown = true;
             // Get configurable values from server response
             const clientModalSeconds   = data.clientModalSeconds     || 30;
             const bugReportWindowMins  = data.bugReportWindowMinutes || 5;
@@ -2454,6 +2458,7 @@ let _lastKnownBetaCreatedAt = null;
             // MANDATORY: auto-reload fires after countdown regardless of dismiss
             if (_updateTimer) clearTimeout(_updateTimer);
             _updateTimer = setTimeout(() => {
+                _updateModalShown = false; // reset flag before reload
                 overlay.classList.remove('active');
                 sessionStorage.setItem('_stableLoad', '1'); // tells stable page to clear beta flags
                 location.reload();
@@ -2469,7 +2474,10 @@ let _lastKnownBetaCreatedAt = null;
             const bugForm = document.getElementById('updateBugForm');
             // Don't dismiss if clicking inside the bug report form
             if (bugForm && bugForm.contains(event.target) && bugForm.style.display !== 'none') return;
-            if (overlay) overlay.classList.remove('active');
+            if (overlay) {
+                overlay.classList.remove('active');
+                // Don't reset _updateModalShown here - timer still needs to fire
+            }
             // Timer keeps running invisibly
         }
 
@@ -2535,7 +2543,7 @@ let _lastKnownBetaCreatedAt = null;
 
                     if (isNew) {
                         // Show mandatory update countdown modal for newly detected beta
-                        if (_lastKnownBetaCreatedAt !== betaUpdatedAt) {
+                        if (_lastKnownBetaCreatedAt !== betaUpdatedAt && !_updateModalShown) {
                             _lastKnownBetaCreatedAt = betaUpdatedAt;
                             showUpdateModal(data);
                         }
