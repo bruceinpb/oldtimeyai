@@ -508,6 +508,10 @@
       <button class="btn-save-threshold" onclick="saveHeartbeat()">Save</button>
     </div>
     <div class="threshold-hint" id="heartbeatHint">Last run: checking...</div>
+    <div id="heartbeatCountdownRow" style="display:none;margin-top:6px;display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)">Next run</span>
+      <span id="heartbeatCountdown" style="font-size:15px;font-weight:700;font-family:'Special Elite',monospace;color:var(--blue);letter-spacing:.04em">--:--</span>
+    </div>
   </div>
   <div class="threshold-card">
     <div class="label">🚦 Reports/hr Limit</div>
@@ -525,6 +529,10 @@
       <button class="btn-save-threshold" onclick="saveAutoPromote()">Save</button>
     </div>
     <div class="threshold-hint">Beta auto-promotes to stable after this many minutes (1440 = 24h, 0 = manual only)</div>
+    <div id="autoPromoteCountdownRow" style="display:none;margin-top:6px;align-items:center;gap:6px">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)">Promotes in</span>
+      <span id="autoPromoteCountdownMini" style="font-size:15px;font-weight:700;font-family:'Special Elite',monospace;color:var(--gold);letter-spacing:.04em">--:--</span>
+    </div>
   </div>
   <div class="threshold-card">
     <div class="label">📱 Client Modal</div>
@@ -534,6 +542,10 @@
       <button class="btn-save-threshold" onclick="saveClientModal()">Save</button>
     </div>
     <div class="threshold-hint">Countdown before auto-update loads on client (5–300 sec)</div>
+    <div id="clientModalCountdownRow" style="display:none;margin-top:6px;align-items:center;gap:6px">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)">Modal fires in</span>
+      <span id="clientModalCountdownMini" style="font-size:15px;font-weight:700;font-family:'Special Elite',monospace;color:#c084fc;letter-spacing:.04em">--:--</span>
+    </div>
   </div>
   <div class="threshold-card">
     <div class="label">🐛 Bug Report Window</div>
@@ -676,6 +688,7 @@
         if (data.heartbeatInterval) {
           document.getElementById("heartbeatInput").value = data.heartbeatInterval;
           localStorage.setItem("autopilot_heartbeat_interval", data.heartbeatInterval);
+          _heartbeatIntervalMin = data.heartbeatInterval;
         }
         if (data.autoPromoteMinutes) {
           document.getElementById("autoPromoteInput").value = data.autoPromoteMinutes;
@@ -694,8 +707,10 @@
         // Show last heartbeat time
         const hint = document.getElementById("heartbeatHint");
         if (data.lastHeartbeatAt) {
+          _lastHeartbeatAt = data.lastHeartbeatAt;
           const ago = Math.round((Date.now() - new Date(data.lastHeartbeatAt)) / 60000);
           hint.textContent = ago < 1 ? "Last run: just now" : `Last run: ${ago}m ago`;
+          startHeartbeatMiniTimer();
         } else {
           hint.textContent = "Last run: never (pending deploy)";
         }
@@ -770,70 +785,133 @@
   }
 
   // ── Auto-Promote Countdown Timer ─────────────────────────────────────────
-  let _countdownInterval = null;
-  let _autoPromoteMinutes = 1440;  // loaded from server — never read from DOM input
+  let _countdownInterval  = null;
+  let _heartbeatInterval2 = null;   // drives the heartbeat mini-timer (separate from main interval)
+  let _autoPromoteMinutes = 1440;   // loaded from server — never read from DOM input
+  let _lastHeartbeatAt    = null;   // ISO string, set by loadThreshold + syncBetaState
+  let _heartbeatIntervalMin = 5;    // minutes, set by loadThreshold + syncBetaState
 
+  // ── Helper: format seconds as MM:SS or Xh MMm SSs ─────────────────────────
+  function fmtRemaining(ms) {
+    if (ms <= 0) return "Now!";
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  // ── Heartbeat mini-timer: "Next run MM:SS" inside the Heartbeat card ───────
+  function startHeartbeatMiniTimer() {
+    if (_heartbeatInterval2) clearInterval(_heartbeatInterval2);
+    const row = document.getElementById("heartbeatCountdownRow");
+    const el  = document.getElementById("heartbeatCountdown");
+    if (!row || !el) return;
+
+    function tick() {
+      if (!_lastHeartbeatAt || !_heartbeatIntervalMin) { row.style.display = "none"; return; }
+      const nextAt    = new Date(_lastHeartbeatAt).getTime() + (_heartbeatIntervalMin * 60 * 1000);
+      const remaining = nextAt - Date.now();
+      if (remaining <= 0) {
+        el.textContent   = "Now!";
+        el.style.color   = "var(--green)";
+        row.style.display = "flex";
+      } else {
+        el.textContent   = fmtRemaining(remaining);
+        el.style.color   = remaining < 60000 ? "var(--red)" : "var(--blue)";
+        row.style.display = "flex";
+      }
+    }
+    tick();
+    _heartbeatInterval2 = setInterval(tick, 1000);
+  }
+
+  // ── Main promote + mini countdowns: all driven from one interval ───────────
   function startCountdown(betaCreatedAt, autoPromoteMinutes) {
-    const card = document.getElementById("countdownCard");
+    const card    = document.getElementById("countdownCard");
     const display = document.getElementById("countdownDisplay");
-    const sub = document.getElementById("countdownSub");
+    const sub     = document.getElementById("countdownSub");
 
-    // Clear any existing countdown
+    // Mini-timer elements (inside the setting cards)
+    const apRow   = document.getElementById("autoPromoteCountdownRow");
+    const apMini  = document.getElementById("autoPromoteCountdownMini");
+    const cmRow   = document.getElementById("clientModalCountdownRow");
+    const cmMini  = document.getElementById("clientModalCountdownMini");
+
     if (_countdownInterval) clearInterval(_countdownInterval);
 
-    if (!betaCreatedAt || !autoPromoteMinutes || autoPromoteMinutes <= 0) {
+    // Hide all mini timers if no valid beta
+    function hideAll() {
       card.style.display = "none";
-      return;
+      if (apRow)  apRow.style.display  = "none";
+      if (cmRow)  cmRow.style.display  = "none";
     }
 
-    const promoteAt = new Date(betaCreatedAt).getTime() + (autoPromoteMinutes * 60 * 1000);
+    if (!betaCreatedAt || !autoPromoteMinutes || autoPromoteMinutes <= 0) { hideAll(); return; }
 
-    // Guard: if deadline is already past, hide the card entirely — promotion already happened
-    if (promoteAt <= Date.now()) {
-      card.style.display = "none";
-      return;
-    }
+    const promoteAt      = new Date(betaCreatedAt).getTime() + (autoPromoteMinutes * 60 * 1000);
+    const CI_CD_BUFFER   = 120 * 1000;  // 2 min CI/CD — same as index.html
+    const stableAt       = promoteAt + CI_CD_BUFFER;
+    const clientModalSec = parseInt(document.getElementById("clientModalSecondsInput")?.value || "30");
+    const modalFiresAt   = stableAt - (clientModalSec * 1000);
+
+    if (promoteAt <= Date.now()) { hideAll(); return; }
 
     card.style.display = "flex";
     card.style.flexDirection = "column";
+    if (apRow) apRow.style.display = "flex";
 
     function tick() {
-      const remaining = promoteAt - Date.now();
-      if (remaining <= 0) {
-        display.textContent = "Now!";
-        display.style.color = "var(--green)";
+      const now           = Date.now();
+      const remainPromote = promoteAt  - now;
+      const remainStable  = stableAt   - now;
+      const remainModal   = modalFiresAt - now;
+
+      // ── Main countdown card (NEXT AUTO-PROMOTE) ──────────────────────────
+      if (remainPromote <= 0) {
+        display.textContent  = "Now!";
+        display.style.color  = "var(--green)";
         display.style.animation = "";
-        sub.textContent = "auto-promote firing…";
+        sub.textContent      = "auto-promote firing…";
         clearInterval(_countdownInterval);
-        // Refresh beta state after 5s to pick up promoted status, then hide
         setTimeout(() => { syncBetaState(); stopCountdown(); }, 5000);
-        return;
-      }
-
-      const totalSec = Math.floor(remaining / 1000);
-      const h = Math.floor(totalSec / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-
-      if (h > 0) {
-        display.textContent = `${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
       } else {
-        display.textContent = `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+        display.textContent = fmtRemaining(remainPromote);
+        display.style.color = remainPromote < 60000 ? "var(--red)" :
+                              remainPromote < 300000 ? "var(--gold)" : "var(--gold)";
+        display.style.animation = remainPromote < 300000 ? "pulse 1s ease-in-out infinite" : "";
+        const pd = new Date(promoteAt);
+        sub.textContent = `auto-promotes at ${pd.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`;
       }
 
-      // Color shift as deadline approaches
-      if (remaining < 60000) {         // < 1 min
-        display.style.color = "var(--red, #f07070)";
-      } else if (remaining < 300000) { // < 5 min
-        display.style.color = "var(--gold)";
-        display.style.animation = "pulse 1s ease-in-out infinite";
-      } else {
-        display.style.color = "var(--gold)";
-        display.style.animation = "";
+      // ── Auto-Promote mini (inside 🚀 card) ──────────────────────────────
+      if (apMini && apRow) {
+        if (remainPromote <= 0) {
+          apMini.textContent = "Now!";
+          apMini.style.color = "var(--green)";
+        } else {
+          apMini.textContent = fmtRemaining(remainPromote);
+          apMini.style.color = remainPromote < 60000 ? "var(--red)" : "var(--gold)";
+        }
+        apRow.style.display = "flex";
       }
 
-      const promoteDate = new Date(promoteAt);
-      sub.textContent = `auto-promotes at ${promoteDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;
+      // ── Client Modal mini (inside 📱 card) ──────────────────────────────
+      if (cmMini && cmRow) {
+        if (remainModal <= 0 && remainStable > 0) {
+          // Modal has fired, page reload pending
+          cmMini.textContent = "Loading…";
+          cmMini.style.color = "var(--green)";
+          cmRow.style.display = "flex";
+        } else if (remainModal <= 0) {
+          cmRow.style.display = "none";
+        } else {
+          cmMini.textContent = fmtRemaining(remainModal);
+          cmMini.style.color = remainModal < 60000 ? "var(--red)" : "#c084fc";
+          cmRow.style.display = "flex";
+        }
+      }
     }
 
     tick();
@@ -842,8 +920,12 @@
 
   function stopCountdown() {
     if (_countdownInterval) clearInterval(_countdownInterval);
-    const card = document.getElementById("countdownCard");
-    if (card) card.style.display = "none";
+    const card   = document.getElementById("countdownCard");
+    const apRow  = document.getElementById("autoPromoteCountdownRow");
+    const cmRow  = document.getElementById("clientModalCountdownRow");
+    if (card)  card.style.display  = "none";
+    if (apRow) apRow.style.display = "none";
+    if (cmRow) cmRow.style.display = "none";
   }
 
   function saveThreshold() {
@@ -1108,9 +1190,11 @@
 
       // Refresh last heartbeat hint
       if (settings.lastHeartbeatAt) {
+        _lastHeartbeatAt = settings.lastHeartbeatAt;
         const ago = Math.round((Date.now() - new Date(settings.lastHeartbeatAt)) / 60000);
         document.getElementById("heartbeatHint").textContent =
           ago < 1 ? "Last run: just now" : `Last run: ${ago}m ago`;
+        startHeartbeatMiniTimer();
       }
 
       _betaIsLive = data.exists && data.status === "published";  // "promoted" means already done — not live
