@@ -2574,17 +2574,50 @@ let _lastKnownBetaCreatedAt = null;
 
                         if (createdAt && !_updateModalShown && _lastKnownBetaCreatedAt !== betaUpdatedAt) {
                             _lastKnownBetaCreatedAt = betaUpdatedAt;
-                            const promotesAtMs   = createdAt.getTime()
-                                                 + (autoPromoteMins  * 60 * 1000)
-                                                 + (CI_CD_BUFFER_SEC * 1000);
-                            const modalFiresAtMs = promotesAtMs - (clientModalSecs * 1000);
+
+                            // ── How we calculate when the reload should fire ────────────────
+                            // Root cause of the previous bug: we estimated promotesAt as
+                            // createdAt + autoPromoteMinutes, but the heartbeat runs on a
+                            // fixed Cloud Scheduler tick. If the beta was created just after
+                            // a heartbeat, the actual promote fires up to heartbeatInterval
+                            // minutes later. This made the modal fire up to 5 min too early,
+                            // before the new stable page was on Firebase Hosting.
+                            //
+                            // Fix: use data.githubPushedAt when available (server stamps it
+                            // at the exact moment the GitHub push succeeds). The reload fires
+                            // CI_CD_BUFFER_SEC after that — when Firebase is definitely live.
+                            //
+                            // If githubPushedAt is null (beta not yet promoted), fall back to
+                            // the estimate using createdAt. The setTimeout will re-run on the
+                            // next poller tick (60s) and upgrade to the real timestamp once
+                            // the server promotes and stamps githubPushedAt.
+                            let stableAtMs;
+                            if (data.githubPushedAt) {
+                                // EXACT: server told us when GitHub push happened
+                                stableAtMs = data.githubPushedAt + (CI_CD_BUFFER_SEC * 1000);
+                            } else {
+                                // ESTIMATE: beta not yet promoted — use createdAt + worst-case delay
+                                // Worst case = autoPromoteMinutes + one full heartbeat cycle (jitter)
+                                const heartbeatJitterMs = (autoPromoteMins * 60 * 1000);
+                                stableAtMs = createdAt.getTime()
+                                           + heartbeatJitterMs             // actual promote time (unknown)
+                                           + (autoPromoteMins * 60 * 1000) // double the window = safe upper bound
+                                           + (CI_CD_BUFFER_SEC * 1000);
+                                // This over-estimates intentionally — better to show modal a bit late
+                                // than to reload before the new stable is live.
+                            }
+
+                            const modalFiresAtMs = stableAtMs - (clientModalSecs * 1000);
                             const msUntilModal   = modalFiresAtMs - Date.now();
 
                             if (msUntilModal <= 0) {
                                 // Already past modal-fire time — show immediately
                                 showUpdateModal(data);
                             } else {
-                                // Schedule modal for exactly the right moment
+                                // Schedule modal for exactly the right moment.
+                                // The poller runs every 60s — if githubPushedAt becomes available
+                                // before this timeout fires, the next poll will recalculate with
+                                // the exact timestamp and may fire sooner/later as appropriate.
                                 setTimeout(() => {
                                     if (!_updateModalShown) showUpdateModal(data);
                                 }, msUntilModal);

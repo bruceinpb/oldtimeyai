@@ -623,6 +623,7 @@ exports.counter = onRequest(
           clientModalSeconds,
           bugReportWindowMinutes,
           autoPromoteMinutes,
+          githubPushedAt: d.githubPushedAt || null,  // ms epoch when GitHub push fired; null if not yet promoted
           createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
           updatedAt: d.updatedAt?.toDate?.()?.toISOString() || null,
           promotedAt: d.promotedAt?.toDate?.()?.toISOString() || null,
@@ -723,9 +724,10 @@ exports.counter = onRequest(
           diagnosis:     betaData.diagnosis || ""
         });
         await db.collection("config").doc("betaVersion").update({
-          status:     "promoted",
-          promotedAt: admin.firestore.FieldValue.serverTimestamp(),
-          commitSha:  finalCommitSha
+          status:         "promoted",
+          promotedAt:     admin.firestore.FieldValue.serverTimestamp(),
+          githubPushedAt: Date.now(),   // ms epoch — client uses this + 120s for reload timing
+          commitSha:      finalCommitSha
         });
 
         logger.info("Beta promoted to stable via GitHub", { commitSha: finalCommitSha, imagesGenerated });
@@ -1183,10 +1185,11 @@ exports.counter = onRequest(
 
                   if (finalCommitSha) {
                     await db.collection("config").doc("betaVersion").update({
-                      status:      "promoted",
-                      promotedAt:  admin.firestore.FieldValue.serverTimestamp(),
-                      autoPromoted: true,
-                      commitSha:   finalCommitSha
+                      status:        "promoted",
+                      promotedAt:    admin.firestore.FieldValue.serverTimestamp(),
+                      githubPushedAt: Date.now(),   // ms epoch — client uses this + 120s for reload timing
+                      autoPromoted:  true,
+                      commitSha:     finalCommitSha
                     });
                     logger.info("Heartbeat: auto-promote SUCCESS", { commitSha: finalCommitSha });
                   }
