@@ -2441,7 +2441,7 @@ let _lastKnownBetaCreatedAt = null;
             if (_updateTimer) clearTimeout(_updateTimer);
             _updateTimer = setTimeout(() => {
                 overlay.classList.remove('active');
-                applyBetaVersion();
+                location.reload();
             }, clientModalSeconds * 1000);
         }
 
