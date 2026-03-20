@@ -157,6 +157,40 @@
             margin-top: 15px;
         }
 
+        .feature-counter {
+            margin: 15px 0 5px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, var(--ink) 0%, var(--deep-brown) 100%);
+            border: 1px solid var(--gold);
+            border-radius: 6px;
+            box-shadow: 0 0 15px rgba(212, 160, 23, 0.3);
+        }
+
+        .feature-status {
+            font-family: 'Special Elite', monospace;
+            font-size: 0.85rem;
+            color: var(--gold);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .feature-counter.incoming .feature-status {
+            color: var(--cream);
+            animation: featureAlert 2s ease-in-out infinite;
+        }
+
+        .feature-countdown {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--rust);
+            margin-left: 8px;
+        }
+
+        @keyframes featureAlert {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
         .deco-line {
             display: flex;
             align-items: center;
@@ -1392,6 +1426,9 @@
             <div class="title-container">
                 <div class="ornament-top">✦ ✦ ✦</div>
                 <h1>Old Timey AI</h1>
+                <div class="feature-counter" id="featureCounter">
+                    <span class="feature-status">No new features incoming</span>
+                </div>
                 <p class="subtitle">~ Journey Through the Annals of History ~</p>
                 <p class="credit">Created, Hosted, and Paid For By Bruce Taylor</p>
             </div>
@@ -2536,6 +2573,7 @@ let _lastKnownBetaCreatedAt = null;
                 if (!r.ok) return;
                 const data = await r.json();
                 _betaData = data;
+                updateFeatureCounter(); // Update feature counter when beta data changes
                 const betaBtn = document.getElementById('betaBtn');
                 if (!betaBtn) return;
 
@@ -2732,6 +2770,49 @@ let _lastKnownBetaCreatedAt = null;
         // _isBetaSession only affects the accept button label in the modal.
         checkBetaStatus();
         _betaPollerInterval = setInterval(checkBetaStatus, 60 * 1000);
+
+        // Feature counter system
+        function updateFeatureCounter() {
+            const counter = document.getElementById('featureCounter');
+            const statusEl = counter.querySelector('.feature-status');
+            
+            if (_betaData && _betaData.githubPushedAt && _betaData.status !== 'promoted') {
+                const CI_CD_BUFFER_SEC = 120;
+                const clientModalSecs = _betaData.clientModalSeconds || 30;
+                const stableAtMs = _betaData.githubPushedAt + (CI_CD_BUFFER_SEC * 1000);
+                const now = Date.now();
+                
+                if (now < stableAtMs) {
+                    // Feature is incoming
+                    const remainingMs = stableAtMs - now;
+                    const minutes = Math.floor(remainingMs / 60000);
+                    const seconds = Math.floor((remainingMs % 60000) / 1000);
+                    
+                    counter.classList.add('incoming');
+                    statusEl.innerHTML = `A New Feature or Bug is incoming. Expect landing in <span class="feature-countdown">${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>`;
+                    
+                    // Schedule refresh when update lands
+                    if (remainingMs <= 5000) {
+                        setTimeout(() => {
+                            location.reload();
+                        }, remainingMs + 1000);
+                    }
+                } else {
+                    // Feature has landed, should refresh
+                    counter.classList.remove('incoming');
+                    statusEl.textContent = 'New features have landed! Refreshing...';
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } else {
+                // No incoming features
+                counter.classList.remove('incoming');
+                statusEl.textContent = 'No new features incoming';
+            }
+        }
+
+        // Update feature counter every 5 seconds for smooth countdown
+        setInterval(updateFeatureCounter, 5000);
+        updateFeatureCounter();
 
         // Page Visibility API: fire immediately when tab regains focus.
         // Eliminates browser background-tab throttling delays.
